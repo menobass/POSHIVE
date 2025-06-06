@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Receipt</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; background: #f8f8f8; }
+        h1 { color: #b5651d; }
+        .receipt-form { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px #eee; max-width: 500px; margin: 0 auto 2rem auto; }
+        .receipt-display { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px #eee; max-width: 500px; margin: 0 auto; }
+        .receipt-table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+        .receipt-table th, .receipt-table td { border-bottom: 1px solid #eee; padding: 0.5em 0.7em; text-align: left; }
+        .receipt-table th { background: #f4f4f4; }
+        .receipt-total { font-size: 1.2em; font-weight: bold; text-align: right; margin-top: 1em; }
+        .receipt-meta { margin-bottom: 1em; color: #555; }
+        .paid-type { font-weight: bold; color: #27ae60; }
+        @media (max-width: 600px) {
+            body { margin: 0.5rem; }
+            .receipt-form, .receipt-display { padding: 0.7rem; max-width: 98vw; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Review Receipt</h1>
+    <div class="receipt-form">
+        <label for="receiptFile"><b>Load Receipt JSON:</b></label>
+        <input type="file" id="receiptFile" accept="application/json" style="margin-top:0.5em;">
+    </div>
+    <div id="receiptDisplay"></div>
+    <script>
+    document.getElementById('receiptFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const data = JSON.parse(evt.target.result);
+                renderReceipt(data);
+            } catch (err) {
+                document.getElementById('receiptDisplay').innerHTML = '<div style="color:#e74c3c;">Invalid JSON file.</div>';
+            }
+        };
+        reader.readAsText(file);
+    });
+    function renderReceipt(data) {
+        let html = '<div class="receipt-display">';
+        html += `<div class='receipt-meta'><b>Date:</b> ${data.timestamp ? new Date(data.timestamp).toLocaleString() : 'N/A'}</div>`;
+        html += `<div class='receipt-meta'><b>Payment Type:</b> <span class='paid-type'>${data.paymentType ? data.paymentType.toUpperCase() : 'N/A'}</span></div>`;
+        html += '<table class="receipt-table">';
+        html += '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>';
+        if (Array.isArray(data.items)) {
+            data.items.forEach(item => {
+                html += `<tr><td>${item.name || ''}</td><td>${item.qty || 0}</td><td>$${item.price ? item.price.toFixed(2) : '0.00'}</td><td>$${item.qty && item.price ? (item.qty * item.price).toFixed(2) : '0.00'}</td></tr>`;
+            });
+        }
+        html += '</table>';
+        html += `<div class='receipt-total'>Total Paid: $${data.total ? data.total.toFixed(2) : '0.00'}</div>`;
+        html += '</div>';
+        document.getElementById('receiptDisplay').innerHTML = html;
+    }
+    </script>
+</body>
+</html>

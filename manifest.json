@@ -1,0 +1,21 @@
+{
+  "name": "Hive POS",
+  "short_name": "HivePOS",
+  "start_url": "pos.html",
+  "display": "standalone",
+  "background_color": "#f8f8f8",
+  "theme_color": "#b5651d",
+  "description": "White-label POS system for Hive blockchain payments.",
+  "icons": [
+    {
+      "src": "images/sweetplace logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "images/sweetplace logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

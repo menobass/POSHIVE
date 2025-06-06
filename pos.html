@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Point of Sale</title>
+    <meta name="theme-color" content="#b5651d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Hive POS">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/sweetplace logo.png">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; background: #f8f8f8; }
+        h1 { color: #b5651d; }
+        #categoryTabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+        .menu-list { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+        .menu-item { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #eee; padding: 1rem; width: 160px; min-width: 120px; cursor: pointer; transition: box-shadow 0.2s; display: flex; flex-direction: column; align-items: center; }
+        .menu-item:hover { box-shadow: 0 4px 16px #ccc; }
+        .menu-item img { width: 100%; height: 90px; object-fit: cover; border-radius: 4px; }
+        .menu-item h3 { font-size: 1.1em; margin: 0.5em 0 0.2em 0; text-align: center; }
+        .menu-item p { font-size: 1em; margin: 0; text-align: center; }
+        .cart { margin-top: 2rem; background: hsl(0, 0%, 100%); border-radius: 8px; box-shadow: 0 2px 8px #eee; padding: 1rem; max-width: 100%; width: 100%; box-sizing: border-box; }
+        .cart h2 { margin-top: 0; font-size: 1.2em; }
+        .cart-list { list-style: none; padding: 0; margin: 0; }
+        .cart-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #eee; font-size: 1em; }
+        .cart-list button { font-size: 1.1em; padding: 0.3em 0.7em; margin: 0 2px; border-radius: 4px; border: none; background: #eee; color: #333; cursor: pointer; }
+        .cart-list button:active { background: #b5651d; color: #fff; }
+        .cart-list .remove-btn { background: #e74c3c; color: #fff; }
+        .cart-total { font-size: 1.2em; font-weight: bold; text-align: right; margin-top: 1rem; }
+        .pay-btn { width: 100%; background: #27ae60; color: #fff; border: none; padding: 1rem; border-radius: 4px; font-size: 1.2em; margin-top: 1rem; cursor: pointer; }
+        @media (max-width: 600px) {
+            body { margin: 0.5rem; }
+            .menu-list { gap: 0.5rem; }
+            .menu-item { width: 45vw; min-width: 100px; padding: 0.5rem; }
+            .menu-item img { height: 60px; }
+            .cart { padding: 0.5rem; }
+            .cart-list li { font-size: 0.95em; }
+            .pay-btn { padding: 0.7rem; font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <div id="bannerContainer" style="text-align:center;margin-bottom:1rem;"></div>
+    <h1 id="businessNameHeader">Point of Sale</h1>
+    <div id="categoryTabs"></div>
+    <div class="menu-list" id="menuList"></div>
+    <div class="cart" id="cart">
+        <h2 style="display:inline-flex;align-items:center;gap:0.5em;">Cart
+            <button id="clearCartBtn" title="Clear Cart" style="background:#e74c3c;color:#fff;border:none;border-radius:50%;width:2em;height:2em;display:inline-flex;align-items:center;justify-content:center;font-size:1.2em;margin-left:0.5em;cursor:pointer;vertical-align:middle;">
+                🗑️
+            </button>
+        </h2>
+        <ul class="cart-list" id="cartList"></ul>
+        <div class="cart-total" id="cartTotal">Total: $0.00</div>
+    </div>
+    <div id="hiveAccountDisplay" style="position:absolute;top:1.5rem;right:2rem;font-size:1.1em;color:#333;background:#fff2;border-radius:6px;padding:0.4em 1em;box-shadow:0 2px 8px #eee;"></div>
+    <div id="qrInlineContainer" style="display:none;justify-content:center;margin-top:1.5rem;"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        // Load items from localStorage
+        function getItems() {
+            return JSON.parse(localStorage.getItem('pos_items') || '[]');
+        }
+        // --- Banner and Business Name Logic ---
+        function getStoreSettings() {
+            return JSON.parse(localStorage.getItem('pos_settings') || '{"businessName":"","bannerUrl":"","categories":["drink","pastry","bread","other"],"hiveAccount":""}');
+        }
+        function renderBannerAndName() {
+            const settings = getStoreSettings();
+            // Banner
+            const bannerDiv = document.getElementById('bannerContainer');
+            bannerDiv.innerHTML = settings.bannerUrl ? `<img src="${settings.bannerUrl}" alt="Banner" style="max-width:100%;max-height:120px;border-radius:8px;">` : '';
+            // Business Name
+            document.getElementById('businessNameHeader').textContent = settings.businessName || 'Point of Sale';
+        }
+        // --- Category Tabs Logic (updated to use store settings) ---
+        function getCategories(items) {
+            const settings = getStoreSettings();
+            // Only show categories that exist in store settings
+            return (settings.categories || []).filter(cat => items.some(item => item.category === cat));
+        }
+        let currentCategory = 'all';
+        function renderCategoryTabs(items) {
+            const cats = getCategories(items);
+            const tabs = document.getElementById('categoryTabs');
+            tabs.innerHTML = '';
+            // All button
+            const allBtn = document.createElement('button');
+            allBtn.textContent = 'All';
+            allBtn.style.fontWeight = currentCategory === 'all' ? 'bold' : '';
+            allBtn.onclick = () => { currentCategory = 'all'; renderMenu(); };
+            tabs.appendChild(allBtn);
+            // Category buttons
+            cats.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+                btn.style.fontWeight = currentCategory === cat ? 'bold' : '';
+                btn.onclick = () => { currentCategory = cat; renderMenu(); };
+                tabs.appendChild(btn);
+            });
+        }
+        // Render menu
+        function renderMenu() {
+            renderBannerAndName();
+            renderHiveAccount();
+            const items = getItems();
+            renderCategoryTabs(items);
+            const menu = document.getElementById('menuList');
+            menu.innerHTML = '';
+            const filtered = currentCategory === 'all' ? items : items.filter(i => i.category === currentCategory);
+            filtered.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'menu-item';
+                div.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <h3>${item.name}</h3>
+                    <p><b>Price:</b> $${item.price.toFixed(2)}</p>
+                `;
+                div.onclick = () => addToCart(item);
+                menu.appendChild(div);
+            });
+        }
+        // Cart logic
+        let cart = [];
+        function addToCart(item) {
+            // Check if item already in cart
+            const found = cart.find(ci => ci.id === item.id);
+            if (found) {
+                found.qty += 1;
+            } else {
+                cart.push({ ...item, qty: 1 });
+            }
+            renderCart();
+        }
+        function renderCart() {
+            const list = document.getElementById('cartList');
+            list.innerHTML = '';
+            cart.forEach((item, idx) => {
+                const lineTotal = item.price * item.qty;
+                list.innerHTML += `<li>
+                    <span>${item.name} x${item.qty}</span>
+                    <span>
+                        <button onclick="changeQty(${idx}, -1)" style="margin-right:2px;">-</button>
+                        <button onclick="changeQty(${idx}, 1)" style="margin-right:8px;">+</button>
+                        <button onclick="removeFromCart(${idx})" style="background:#e74c3c;">🗑️</button>
+                        $${lineTotal.toFixed(2)}
+                    </span>
+                </li>`;
+            });
+            const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+            document.getElementById('cartTotal').textContent = `Total: $${total.toFixed(2)}`;
+        }
+        function renderHiveAccount() {
+            const settings = getStoreSettings();
+            const hiveDiv = document.getElementById('hiveAccountDisplay');
+            if (settings.hiveAccount) {
+                hiveDiv.innerHTML = `<b>Receiving Hive:</b> @${settings.hiveAccount}`;
+                hiveDiv.style.display = '';
+            } else {
+                hiveDiv.innerHTML = '';
+                hiveDiv.style.display = 'none';
+            }
+        }
+        // QR Inline logic
+        function showQrInline() {
+            const settings = getStoreSettings();
+            const hiveAccount = settings.hiveAccount;
+            if (!hiveAccount) {
+                alert('No Hive account set for receiving payments.');
+                return;
+            }
+            const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+            if (total <= 0) {
+                alert('Cart is empty.');
+                return;
+            }
+            // Prepare memo: use current system time (ISO string)
+            const memoDecoded = new Date().toISOString();
+            window.lastPaymentMemo = memoDecoded; // Save for listener
+            window.lastPaymentAmount = `${total.toFixed(3)} HBD`;
+            const op = [
+              "transfer",
+              {
+                to: hiveAccount,
+                amount: `${total.toFixed(3)} HBD`,
+                memo: memoDecoded
+              }
+            ];
+            const json = JSON.stringify(op);
+            const base64 = btoa(json)
+              .replace(/\+/g, "-")
+              .replace(/\//g, "_")
+              .replace(/=+$/, "");
+            const uri = `hive://sign/op/${base64}`;
+
+            // Generate QR code
+            const qrDiv = document.getElementById('qrInlineContainer');
+            qrDiv.innerHTML = `<div style='background:#fff;padding:1.5rem 1rem 1rem 1rem;border-radius:12px;box-shadow:0 4px 24px #0002;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:350px;margin:auto;'>
+                <h2 style='margin-top:0;text-align:center;'>Scan to Pay with Hive Keychain</h2>
+                <div id='qrCodeInline' style='margin:1rem 0;min-height:240px;'></div>
+                <div style='font-size:1.1em;margin-bottom:1rem;text-align:center;'><b>To:</b> @${hiveAccount}<br><b>Amount:</b> ${total.toFixed(3)} HBD</div>
+                <div style='word-break:break-all;font-size:0.95em;background:#f4f4f4;padding:0.5em 0.7em;border-radius:6px;margin-top:0.5em;text-align:center;'>${uri}</div>
+                <div id='paymentStatus' style='margin-top:1em;font-size:1.1em;color:#27ae60;'></div>
+            </div>`;
+            qrDiv.style.display = 'flex';
+            qrDiv.style.justifyContent = 'center';
+            qrDiv.style.alignItems = 'center';
+            setTimeout(() => {
+                const qrCodeDiv = document.getElementById('qrCodeInline');
+                qrCodeDiv.innerHTML = '';
+                if (window.QRCode) {
+                    new QRCode(qrCodeDiv, {
+                        text: uri,
+                        width: 240,
+                        height: 240,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } else {
+                    qrCodeDiv.textContent = 'QR code library not loaded.';
+                }
+            }, 0);
+            // Start payment listener
+            startPaymentListener();
+        }
+
+        // --- Payment Listener ---
+        let paymentListenerInterval = null;
+        function startPaymentListener() {
+            if (paymentListenerInterval) clearInterval(paymentListenerInterval);
+            const settings = getStoreSettings();
+            const hiveAccount = settings.hiveAccount;
+            const expectedAmount = window.lastPaymentAmount;
+            const expectedMemo = window.lastPaymentMemo;
+            const statusDiv = document.getElementById('paymentStatus');
+            let attempts = 0;
+            paymentListenerInterval = setInterval(async function() {
+                attempts++;
+                if (!hiveAccount || !expectedAmount || !expectedMemo) return;
+                try {
+                    const response = await fetch('https://api.hive.blog', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jsonrpc: '2.0',
+                            method: 'condenser_api.get_account_history',
+                            params: [hiveAccount, -1, 20],
+                            id: 1
+                        })
+                    });
+                    const data = await response.json();
+                    const history = data.result;
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        const op = history[i][1].op;
+                        if (op[0] === 'transfer' &&
+                            op[1].to === hiveAccount &&
+                            op[1].amount === expectedAmount &&
+                            op[1].memo === expectedMemo) {
+                            statusDiv.textContent = '✅ Payment received!';
+                            clearInterval(paymentListenerInterval);
+                            paymentListenerInterval = null;
+                            // Show post-sale actions for HBD
+                            const saleCart = cart.map(i => ({...i}));
+                            const saleTotal = saleCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                            cart = [];
+                            renderCart();
+                            renderMenu();
+                            showPostSaleActions('HBD', saleCart, saleTotal);
+                            return;
+                        }
+                    }
+                    statusDiv.textContent = '⏳ Waiting for payment...';
+                } catch (e) {
+                    statusDiv.textContent = 'Error checking payment.';
+                }
+                if (attempts > 100) {
+                    statusDiv.textContent = 'Payment not detected. Please check manually.';
+                    clearInterval(paymentListenerInterval);
+                    paymentListenerInterval = null;
+                }
+            }, 3000);
+        }
+        // --- Payment Buttons (side by side) ---
+        const cartDiv = document.getElementById('cart');
+        const paymentButtonsHtml = `
+        <div id="paymentButtonsRow" style="display:flex;gap:1em;margin-top:1.5em;justify-content:center;">
+          <button id="payWithCashBtn" type="button" style="flex:1 1 0%;background:#f5b041;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;">Pay with Cash</button>
+          <button id="payWithHbdBtn" type="button" style="flex:1 1 0%;background:#27ae60;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;">Pay with HBD</button>
+        </div>
+        <div id="cashPaymentSection" style="display:none;margin-top:1.5em;text-align:center;">
+          <div style="margin-bottom:1em;">
+            <label for="cashGivenInput"><b>Cash Given:</b></label>
+            <input id="cashGivenInput" type="number" min="0" step="0.01" style="width:100px;font-size:1.1em;margin-left:0.5em;" />
+          </div>
+          <div id="changeDueDisplay" style="font-size:1.2em;margin-bottom:1em;"></div>
+          <button id="finishCashSaleBtn" style="background:#27ae60;color:#fff;font-size:1.2em;padding:0.7em 2em;border:none;border-radius:6px;position:relative;right:0;">Finish Sale</button>
+        </div>
+        `;
+        cartDiv.insertAdjacentHTML('afterend', paymentButtonsHtml);
+        // --- Payment Button Logic ---
+        function setupPaymentButtons() {
+          const payWithCashBtn = document.getElementById('payWithCashBtn');
+          const payWithHbdBtn = document.getElementById('payWithHbdBtn');
+          const qrInline = document.getElementById('qrInlineContainer');
+          const cashSection = document.getElementById('cashPaymentSection');
+          const cashInput = document.getElementById('cashGivenInput');
+          const changeDue = document.getElementById('changeDueDisplay');
+          const finishBtn = document.getElementById('finishCashSaleBtn');
+          function getTotal() {
+            return cart.reduce(function(sum, item) { return sum + item.price * item.qty; }, 0);
+          }
+          function showKeychain() {
+            qrInline.style.display = 'flex';
+            cashSection.style.display = 'none';
+          }
+          function showCash() {
+            qrInline.style.display = 'none';
+            cashSection.style.display = 'block';
+            cashInput.value = '';
+            changeDue.textContent = '';
+          }
+          payWithCashBtn.onclick = showCash;
+          payWithHbdBtn.onclick = function() {
+            showKeychain();
+            showQrInline();
+          };
+          if (cashInput) {
+            cashInput.oninput = function() {
+              var given = parseFloat(cashInput.value);
+              var total = getTotal();
+              if (isNaN(given)) { changeDue.textContent = ''; return; }
+              var change = given - total;
+              changeDue.textContent = (change >= 0) ? ('Change Due: $' + change.toFixed(2)) : 'Not enough cash given.';
+            };
+          }
+          if (finishBtn) {
+            finishBtn.onclick = function() {
+              const saleCart = cart.map(i => ({...i}));
+              const saleTotal = saleCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+              cart = [];
+              renderCart();
+              renderMenu();
+              showPostSaleActions('cash', saleCart, saleTotal);
+            };
+          }
+          // Default to Keychain tab
+          showKeychain();
+        }
+        setupPaymentButtons();
+        // --- Initial Render ---
+        renderMenu();
+        renderCart();
+        renderHiveAccount();
+        // Attach to pay button
+        const payBtn = document.querySelector('.pay-btn');
+        if (payBtn) payBtn.onclick = showQrInline;
+        // Remove old payment mode tabs if present
+        var oldTabs = document.getElementById('paymentModeTabs');
+        if (oldTabs) oldTabs.remove();
+        var oldCashSection = document.querySelectorAll('#cashPaymentSection');
+        if (oldCashSection.length > 1) {
+          for (var i = 1; i < oldCashSection.length; i++) {
+            oldCashSection[i].remove();
+          }
+        }
+        function changeQty(idx, delta) {
+            if (cart[idx]) {
+                cart[idx].qty += delta;
+                if (cart[idx].qty <= 0) {
+                    cart.splice(idx, 1);
+                }
+                renderCart();
+            }
+        }
+        function removeFromCart(idx) {
+            cart.splice(idx, 1);
+            renderCart();
+        }
+        // Expose cart functions to global scope for inline button handlers
+        window.changeQty = changeQty;
+        window.removeFromCart = removeFromCart;
+        // Attach clear cart button logic
+        const clearCartBtn = document.getElementById('clearCartBtn');
+        if (clearCartBtn) {
+            clearCartBtn.onclick = function() {
+                if (cart.length === 0) return;
+                if (confirm('Clear all items from the cart?')) {
+                    cart = [];
+                    renderCart();
+                    // Also hide QR/cash sections if visible
+                    document.getElementById('qrInlineContainer').style.display = 'none';
+                    var cashSection = document.getElementById('cashPaymentSection');
+                    if (cashSection) cashSection.style.display = 'none';
+                }
+            };
+        }
+        // --- Post-Sale Actions ---
+        function showPostSaleActions(paymentType, saleCart, saleTotal) {
+            // Hide payment/cash/QR sections
+            document.getElementById('qrInlineContainer').style.display = 'none';
+            var cashSection = document.getElementById('cashPaymentSection');
+            if (cashSection) cashSection.style.display = 'none';
+            // Hide payment buttons
+            var paymentButtonsRow = document.getElementById('paymentButtonsRow');
+            if (paymentButtonsRow) paymentButtonsRow.style.display = 'none';
+            // Remove previous post-sale actions if any
+            let prev = document.getElementById('postSaleActionsRow');
+            if (prev) prev.remove();
+            // Create buttons
+            const row = document.createElement('div');
+            row.id = 'postSaleActionsRow';
+            row.style = 'display:flex;gap:1em;margin-top:2em;justify-content:center;';
+            // Save Receipt button
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save Receipt';
+            saveBtn.style = 'flex:1 1 0%;background:#2980b9;color:#fff;font-size:1.1em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;';
+            saveBtn.onclick = function() {
+                const now = new Date();
+                const pad = n => n.toString().padStart(2, '0');
+                const filename = `receipt-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.json`;
+                const receipt = {
+                    timestamp: now.toISOString(),
+                    paymentType,
+                    items: saleCart.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price })),
+                    total: saleTotal
+                };
+                const blob = new Blob([JSON.stringify(receipt, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+            };
+            // New Sale button
+            const newBtn = document.createElement('button');
+            newBtn.textContent = 'New Sale';
+            newBtn.style = 'flex:1 1 0%;background:#27ae60;color:#fff;font-size:1.1em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;';
+            newBtn.onclick = function() {
+                cart = [];
+                renderCart();
+                renderMenu();
+                row.remove();
+                // Show payment buttons again and reset their style
+                var paymentButtonsRow = document.getElementById('paymentButtonsRow');
+                if (paymentButtonsRow) {
+                    paymentButtonsRow.style.display = 'flex';
+                    paymentButtonsRow.style.gap = '1em';
+                    paymentButtonsRow.style.marginTop = '1.5em';
+                    paymentButtonsRow.style.justifyContent = 'center';
+                }
+            };
+            row.appendChild(saveBtn);
+            row.appendChild(newBtn);
+            // Insert after cart
+            const cartDiv = document.getElementById('cart');
+            cartDiv.parentNode.insertBefore(row, cartDiv.nextSibling);
+        }
+    </script>
+</body>
+</html>

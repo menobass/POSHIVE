@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Point of Sale Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; background: #f8f8f8; }
+        h1 { color: #b5651d; }
+        form { margin-bottom: 2rem; background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 8px #eee; }
+        label { display: block; margin-top: 1rem; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+        button { margin-top: 1rem; background: #b5651d; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+        .items-list { display: flex; flex-wrap: wrap; gap: 1rem; }
+        .item-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #eee; padding: 1rem; width: 220px; position: relative; }
+        .item-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; }
+        .item-actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; }
+        .item-actions button { flex: 1; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Point of Sale Admin</h1>
+    <form id="itemForm" enctype="multipart/form-data">
+        <input type="hidden" id="itemId">
+        <label>Item Name:
+            <input type="text" id="itemName" required>
+        </label>
+        <label>Category:
+            <select id="itemCategory" required>
+                <option value="">Select category</option>
+                <option value="drink">Drink</option>
+                <option value="pastry">Pastry</option>
+                <option value="bread">Bread</option>
+                <option value="other">Other</option>
+            </select>
+        </label>
+        <label>Image File:
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <input type="text" id="itemImage" placeholder="Select an image..." readonly required style="flex:1;">
+                <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+                <button type="button" id="selectImageBtn" style="background:#888;">Select Image</button>
+            </div>
+        </label>
+        <label>Price ($):
+            <input type="number" id="itemPrice" min="0" step="0.01" required>
+        </label>
+        <button type="submit" id="saveBtn">Add Item</button>
+        <button type="button" id="cancelEditBtn" style="display:none; background:#888;">Cancel</button>
+    </form>
+    <div class="items-list" id="itemsList"></div>
+
+    <!-- Store Customization Section -->
+    <div id="storeSettings" style="background:#fff;padding:1rem 1.5rem 1.5rem 1.5rem;margin-bottom:2rem;border-radius:8px;box-shadow:0 2px 8px #eee;max-width:600px;">
+        <h2 style="margin-top:0;">Store Settings</h2>
+        <label>Business Name:
+            <input type="text" id="businessName" placeholder="e.g. Sweet Treats Bakery" style="width:100%;margin-bottom:0.5rem;">
+        </label>
+        <label>Banner Image:
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <input type="text" id="bannerUrl" placeholder="e.g. images/banner.png" style="width:100%;margin-bottom:0.5rem;" readonly>
+                <input type="file" id="bannerFileInput" accept="image/*" style="display:none;">
+                <button type="button" id="selectBannerBtn" style="background:#888;">Select Image</button>
+            </div>
+        </label>
+        <label>Categories:
+            <div id="categoryTags" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;"></div>
+            <div style="display:flex;gap:0.5em;align-items:center;">
+                <input type="text" id="categoryInput" placeholder="Add category and press Enter or tap Add" style="width:100%;">
+                <button type="button" id="addCategoryBtn" style="padding:0.5em 1em;">Add</button>
+            </div>
+        </label>
+        <label>Hive Account to Receive Payments:
+            <div style="display:flex;gap:0.5em;align-items:center;">
+                <input type="text" id="hiveAccount" placeholder="e.g. myhiveaccount" style="width:100%;margin-bottom:0.5rem;">
+                <button type="button" id="updateHiveAccountBtn" style="padding:0.5em 1em;">Update</button>
+            </div>
+            <div id="currentHiveAccountDisplay" style="margin-top:0.5em;color:#555;font-size:1.05em;"></div>
+        </label>
+    </div>
+
+    <script>
+        // Utility: Get items from localStorage
+        function getItems() {
+            return JSON.parse(localStorage.getItem('pos_items') || '[]');
+        }
+        // Utility: Save items to localStorage
+        function saveItems(items) {
+            localStorage.setItem('pos_items', JSON.stringify(items));
+        }
+        // Utility: Generate unique ID
+        function generateId() {
+            return 'item-' + Date.now() + '-' + Math.floor(Math.random()*10000);
+        }
+        // Render items list
+        function renderItems() {
+            const items = getItems();
+            const list = document.getElementById('itemsList');
+            list.innerHTML = '';
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <h3>${item.name}</h3>
+                    <p><b>Category:</b> ${item.category}</p>
+                    <p><b>Price:</b> $${item.price.toFixed(2)}</p>
+                    <div class="item-actions">
+                        <button onclick="editItem('${item.id}')">Edit</button>
+                        <button onclick="deleteItem('${item.id}')" style="background:#e74c3c;">Delete</button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+        // Add or update item
+        document.getElementById('itemForm').onsubmit = function(e) {
+            e.preventDefault();
+            const id = document.getElementById('itemId').value;
+            const name = document.getElementById('itemName').value.trim();
+            const category = document.getElementById('itemCategory').value;
+            const image = document.getElementById('itemImage').value.trim();
+            const price = parseFloat(document.getElementById('itemPrice').value);
+            let items = getItems();
+            if (id) {
+                // Edit mode
+                items = items.map(item => item.id === id ? { ...item, name, category, image, price } : item);
+            } else {
+                // Add mode
+                items.push({ id: generateId(), name, category, image, price });
+            }
+            saveItems(items);
+            this.reset();
+            document.getElementById('itemId').value = '';
+            document.getElementById('saveBtn').textContent = 'Add Item';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            renderItems();
+        };
+        // Edit item
+        window.editItem = function(id) {
+            const items = getItems();
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('itemId').value = item.id;
+            document.getElementById('itemName').value = item.name;
+            renderCategoryOptions();
+            document.getElementById('itemCategory').value = item.category || '';
+            document.getElementById('itemImage').value = item.image;
+            document.getElementById('itemPrice').value = item.price;
+            document.getElementById('saveBtn').textContent = 'Update Item';
+            document.getElementById('cancelEditBtn').style.display = '';
+        };
+        // Cancel edit
+        document.getElementById('cancelEditBtn').onclick = function() {
+            document.getElementById('itemForm').reset();
+            document.getElementById('itemId').value = '';
+            document.getElementById('saveBtn').textContent = 'Add Item';
+            this.style.display = 'none';
+        };
+        // Delete item
+        window.deleteItem = function(id) {
+            if (!confirm('Delete this item?')) return;
+            let items = getItems();
+            items = items.filter(item => item.id !== id);
+            saveItems(items);
+            renderItems();
+        };
+        // Image selection logic
+        const selectImageBtn = document.getElementById('selectImageBtn');
+        const imageFileInput = document.getElementById('imageFileInput');
+        const itemImage = document.getElementById('itemImage');
+
+        selectImageBtn.onclick = function() {
+            imageFileInput.click();
+        };
+
+        imageFileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Only save the filename (relative to images/)
+                itemImage.value = 'images/' + file.name;
+            }
+        };
+
+        // --- Store Settings Logic ---
+        function getStoreSettings() {
+            return JSON.parse(localStorage.getItem('pos_settings') || '{"businessName":"","bannerUrl":"","categories":["drink","pastry","bread","other"],"hiveAccount":""}');
+        }
+        function saveStoreSettings(settings) {
+            localStorage.setItem('pos_settings', JSON.stringify(settings));
+        }
+        function renderStoreSettings() {
+            const settings = getStoreSettings();
+            document.getElementById('businessName').value = settings.businessName || '';
+            document.getElementById('bannerUrl').value = settings.bannerUrl || '';
+            document.getElementById('hiveAccount').value = settings.hiveAccount || '';
+            renderCategoryTags(settings.categories || []);
+        }
+        function renderCategoryTags(categories) {
+            const tagDiv = document.getElementById('categoryTags');
+            tagDiv.innerHTML = '';
+            categories.forEach((cat, idx) => {
+                const tag = document.createElement('span');
+                tag.textContent = cat;
+                tag.style = 'background:#eee;padding:0.3em 0.8em;border-radius:16px;display:inline-flex;align-items:center;gap:0.5em;';
+                const x = document.createElement('button');
+                x.textContent = '×';
+                x.style = 'background:none;border:none;color:#e74c3c;font-size:1.1em;cursor:pointer;margin-left:0.3em;';
+                x.onclick = () => {
+                    const settings = getStoreSettings();
+                    settings.categories.splice(idx, 1);
+                    saveStoreSettings(settings);
+                    renderStoreSettings();
+                    renderCategoryOptions();
+                };
+                tag.appendChild(x);
+                tagDiv.appendChild(tag);
+            });
+        }
+        document.getElementById('categoryInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = this.value.trim();
+                if (!val) return;
+                const settings = getStoreSettings();
+                if (!settings.categories.includes(val)) {
+                    settings.categories.push(val);
+                    saveStoreSettings(settings);
+                    renderStoreSettings();
+                    renderCategoryOptions();
+                }
+                this.value = '';
+            }
+        });
+        document.getElementById('businessName').addEventListener('input', function() {
+            const settings = getStoreSettings();
+            settings.businessName = this.value;
+            saveStoreSettings(settings);
+        });
+        document.getElementById('bannerUrl').addEventListener('input', function() {
+            const settings = getStoreSettings();
+            settings.bannerUrl = this.value;
+            saveStoreSettings(settings);
+        });
+        document.getElementById('hiveAccount').addEventListener('input', function() {
+            const settings = getStoreSettings();
+            settings.hiveAccount = this.value;
+            saveStoreSettings(settings);
+        });
+
+        // Add button logic for category add
+        const addCategoryBtn = document.getElementById('addCategoryBtn');
+        const categoryInput = document.getElementById('categoryInput');
+        addCategoryBtn.onclick = function() {
+            const val = categoryInput.value.trim();
+            if (!val) return;
+            const settings = getStoreSettings();
+            if (!settings.categories.includes(val)) {
+                settings.categories.push(val);
+                saveStoreSettings(settings);
+                renderStoreSettings();
+                renderCategoryOptions();
+            }
+            categoryInput.value = '';
+        };
+
+        // Banner image selection logic
+        const selectBannerBtn = document.getElementById('selectBannerBtn');
+        const bannerFileInput = document.getElementById('bannerFileInput');
+        const bannerUrlInput = document.getElementById('bannerUrl');
+
+        selectBannerBtn.onclick = function() {
+            bannerFileInput.click();
+        };
+        bannerFileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                bannerUrlInput.value = 'images/' + file.name;
+                // Save to store settings
+                const settings = getStoreSettings();
+                settings.bannerUrl = bannerUrlInput.value;
+                saveStoreSettings(settings);
+            }
+        };
+
+        // --- Category select in item form ---
+        function renderCategoryOptions() {
+            const settings = getStoreSettings();
+            const select = document.getElementById('itemCategory');
+            const current = select.value;
+            select.innerHTML = '<option value="">Select category</option>' +
+                (settings.categories || []).map(cat => `<option value="${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</option>`).join('');
+            select.value = current;
+        }
+        // Call on page load
+        renderStoreSettings();
+        renderCategoryOptions();
+        // Initial render
+        renderItems();
+
+        // --- Backup Configuration Logic ---
+        const backupBtn = document.createElement('button');
+        backupBtn.textContent = 'Backup Configuration';
+        backupBtn.style = 'margin:0.5em 0.5em 0.5em 0;font-size:1em;';
+        backupBtn.onclick = function() {
+            // Get items and settings from localStorage
+            let items = JSON.parse(localStorage.getItem('pos_items') || '[]');
+            let settings = JSON.parse(localStorage.getItem('pos_settings') || '{}');
+            // For each item, only keep the image filename (not full URL or base64)
+            items = items.map(item => {
+                let img = item.image || '';
+                // If image is a local file, keep only the filename
+                if (img.startsWith('images/')) {
+                    img = img.split('/').pop();
+                } else if (img.startsWith('data:')) {
+                    img = '';
+                }
+                return { ...item, image: img };
+            });
+            // For banner, keep only filename if local
+            if (settings.bannerUrl && settings.bannerUrl.startsWith('images/')) {
+                settings.bannerUrl = settings.bannerUrl.split('/').pop();
+            }
+            const backup = { items, settings };
+            const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'hive-pos-backup-' + new Date().toISOString().replace(/[:.]/g,'-') + '.json';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        };
+        // Insert the button into the Store Settings section
+        const storeSettingsDiv = document.getElementById('storeSettings');
+        if (storeSettingsDiv) {
+            storeSettingsDiv.appendChild(backupBtn);
+        }
+
+        // --- Restore Configuration Logic ---
+        const restoreBtn = document.createElement('button');
+        restoreBtn.textContent = 'Restore Configuration';
+        restoreBtn.style = 'margin:0.5em 0;font-size:1em;';
+        restoreBtn.onclick = function() {
+            restoreFileInput.click();
+        };
+        const restoreFileInput = document.createElement('input');
+        restoreFileInput.type = 'file';
+        restoreFileInput.accept = 'application/json';
+        restoreFileInput.style.display = 'none';
+        restoreFileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const backup = JSON.parse(evt.target.result);
+                    if (backup.items && Array.isArray(backup.items)) {
+                        // Restore items, but do not restore image data, only filenames
+                        const restoredItems = backup.items.map(item => {
+                            let img = item.image || '';
+                            if (img && !img.startsWith('images/')) img = 'images/' + img;
+                            return { ...item, image: img };
+                        });
+                        localStorage.setItem('pos_items', JSON.stringify(restoredItems));
+                    }
+                    if (backup.settings && typeof backup.settings === 'object') {
+                        // Restore bannerUrl as images/filename if present
+                        let s = { ...backup.settings };
+                        if (s.bannerUrl && s.bannerUrl.length > 0 && !s.bannerUrl.startsWith('images/')) {
+                            s.bannerUrl = 'images/' + s.bannerUrl;
+                        }
+                        localStorage.setItem('pos_settings', JSON.stringify(s));
+                    }
+                    alert('Configuration restored! Reloading...');
+                    location.reload();
+                } catch (err) {
+                    alert('Failed to restore configuration: ' + err);
+                }
+            };
+            reader.readAsText(file);
+        };
+        document.body.appendChild(restoreFileInput);
+        const storeSettingsDiv2 = document.getElementById('storeSettings');
+        if (storeSettingsDiv2) {
+            storeSettingsDiv2.appendChild(restoreBtn);
+        }
+
+        // Hive account update button logic
+        const updateHiveAccountBtn = document.getElementById('updateHiveAccountBtn');
+        const hiveAccountInput = document.getElementById('hiveAccount');
+        const currentHiveAccountDisplay = document.getElementById('currentHiveAccountDisplay');
+        function renderCurrentHiveAccount() {
+            const settings = getStoreSettings();
+            if (settings.hiveAccount) {
+                currentHiveAccountDisplay.textContent = `Current: @${settings.hiveAccount}`;
+            } else {
+                currentHiveAccountDisplay.textContent = 'No account set.';
+            }
+        }
+        updateHiveAccountBtn.onclick = function() {
+            const val = hiveAccountInput.value.trim();
+            const settings = getStoreSettings();
+            settings.hiveAccount = val;
+            saveStoreSettings(settings);
+            renderCurrentHiveAccount();
+        };
+        // On page load, show current account
+        renderCurrentHiveAccount();
+    </script>
+</body>
+</html>
