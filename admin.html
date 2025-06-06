@@ -173,11 +173,34 @@
             imageFileInput.click();
         };
 
+        // Imgur upload logic for item images
+        const IMGUR_CLIENT_ID = '4d83e353ac99be2';
         imageFileInput.onchange = function(e) {
             const file = e.target.files[0];
             if (file) {
-                // Only save the filename (relative to images/)
-                itemImage.value = 'images/' + file.name;
+                itemImage.value = 'Uploading...';
+                const formData = new FormData();
+                formData.append('image', file);
+                fetch('https://api.imgur.com/3/image', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Client-ID ' + IMGUR_CLIENT_ID
+                    },
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data && data.data.link) {
+                        itemImage.value = data.data.link;
+                    } else {
+                        itemImage.value = '';
+                        alert('Image upload failed.');
+                    }
+                })
+                .catch(() => {
+                    itemImage.value = '';
+                    alert('Image upload failed.');
+                });
             }
         };
 
