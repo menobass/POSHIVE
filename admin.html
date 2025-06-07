@@ -286,7 +286,7 @@
             categoryInput.value = '';
         };
 
-        // Banner image selection logic
+        // Banner image selection logic with Imgur upload
         const selectBannerBtn = document.getElementById('selectBannerBtn');
         const bannerFileInput = document.getElementById('bannerFileInput');
         const bannerUrlInput = document.getElementById('bannerUrl');
@@ -297,11 +297,33 @@
         bannerFileInput.onchange = function(e) {
             const file = e.target.files[0];
             if (file) {
-                bannerUrlInput.value = 'images/' + file.name;
-                // Save to store settings
-                const settings = getStoreSettings();
-                settings.bannerUrl = bannerUrlInput.value;
-                saveStoreSettings(settings);
+                bannerUrlInput.value = 'Uploading...';
+                const formData = new FormData();
+                formData.append('image', file);
+                fetch('https://api.imgur.com/3/image', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Client-ID 4d83e353ac99be2'
+                    },
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data && data.data.link) {
+                        bannerUrlInput.value = data.data.link;
+                        // Save to store settings
+                        const settings = getStoreSettings();
+                        settings.bannerUrl = bannerUrlInput.value;
+                        saveStoreSettings(settings);
+                    } else {
+                        bannerUrlInput.value = '';
+                        alert('Banner upload failed.');
+                    }
+                })
+                .catch(() => {
+                    bannerUrlInput.value = '';
+                    alert('Banner upload failed.');
+                });
             }
         };
 
