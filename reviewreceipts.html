@@ -19,6 +19,36 @@
             body { margin: 0.5rem; }
             .receipt-form, .receipt-display { padding: 0.7rem; max-width: 98vw; }
         }
+        @media print {
+          body, .receipt-display {
+            background: #fff !important;
+            color: #000 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 58mm;
+            max-width: 100vw;
+          }
+          .receipt-form, #printBtnContainer, h1 {
+            display: none !important;
+          }
+          .receipt-display {
+            margin: 0 !important;
+            padding: 0.5em !important;
+            width: 100%;
+            font-size: 12px !important;
+          }
+          .receipt-table th, .receipt-table td {
+            font-size: 12px !important;
+            padding: 0.2em 0.3em !important;
+          }
+          .receipt-total {
+            font-size: 13px !important;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 0.5em;
+          }
+        }
     </style>
 </head>
 <body>
@@ -26,6 +56,9 @@
     <div class="receipt-form">
         <label for="receiptFile"><b>Load Receipt JSON:</b></label>
         <input type="file" id="receiptFile" accept="application/json" style="margin-top:0.5em;">
+    </div>
+    <div id="printBtnContainer" style="text-align:center;display:none;">
+        <button id="printReceiptBtn" style="margin-bottom:1em;">Print Receipt</button>
     </div>
     <div id="receiptDisplay"></div>
     <script>
@@ -39,6 +72,7 @@
                 renderReceipt(data);
             } catch (err) {
                 document.getElementById('receiptDisplay').innerHTML = '<div style="color:#e74c3c;">Invalid JSON file.</div>';
+                document.getElementById('printBtnContainer').style.display = 'none';
             }
         };
         reader.readAsText(file);
@@ -58,7 +92,11 @@
         html += `<div class='receipt-total'>Total Paid: $${data.total ? data.total.toFixed(2) : '0.00'}</div>`;
         html += '</div>';
         document.getElementById('receiptDisplay').innerHTML = html;
+        document.getElementById('printBtnContainer').style.display = '';
     }
+    document.getElementById('printReceiptBtn').onclick = function() {
+        window.print();
+    };
     </script>
 </body>
 </html>
