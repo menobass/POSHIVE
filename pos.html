@@ -41,6 +41,11 @@
     </style>
 </head>
 <body>
+    <div id="configSourceBar" style="position:absolute;top:1rem;left:1.5rem;background:#fff7e6;border-radius:6px;padding:0.5em 1em;box-shadow:0 2px 8px #eee;z-index:10;display:flex;align-items:center;gap:1em;min-width:180px;font-size:0.98em;">
+        <span id="configSourceText">Source: Local Storage</span>
+        <button id="updateStoreBtn" style="background:#b5651d;color:#fff;border:none;border-radius:4px;padding:0.3em 0.8em;cursor:pointer;font-size:1em;">Update Store</button>
+        <input type="file" id="storeFileInput" accept="application/json" style="display:none;" />
+    </div>
     <div id="bannerContainer" style="text-align:center;margin-bottom:1rem;"></div>
     <h1 id="businessNameHeader">Point of Sale</h1>
     <div id="categoryTabs"></div>
@@ -365,6 +370,52 @@
             oldCashSection[i].remove();
           }
         }
+        // --- Config Source Bar Logic ---
+        function setConfigSourceText(text) {
+            document.getElementById('configSourceText').textContent = 'Source: ' + text;
+        }
+        function getConfigSource() {
+            return localStorage.getItem('pos_config_source') || 'Local Storage';
+        }
+        setConfigSourceText(getConfigSource());
+        document.getElementById('updateStoreBtn').onclick = function() {
+            document.getElementById('storeFileInput').value = '';
+            document.getElementById('storeFileInput').click();
+        };
+        document.getElementById('storeFileInput').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    // Accept both admin backup format ({items, settings}) and legacy ({pos_items, pos_settings})
+                    let items = null, settings = null;
+                    if (Array.isArray(data.items) && typeof data.settings === 'object') {
+                        items = data.items;
+                        settings = data.settings;
+                    } else if (Array.isArray(data.pos_items) && typeof data.pos_settings === 'object') {
+                        items = data.pos_items;
+                        settings = data.pos_settings;
+                    } else {
+                        throw new Error('Invalid config format.');
+                    }
+                    localStorage.setItem('pos_items', JSON.stringify(items));
+                    localStorage.setItem('pos_settings', JSON.stringify(settings));
+                    localStorage.setItem('pos_config_source', file.name);
+                    setConfigSourceText(file.name);
+                    // Optionally, clear cart
+                    cart = [];
+                    renderCart();
+                    renderMenu();
+                    renderHiveAccount();
+                    alert('Store configuration loaded!');
+                } catch (err) {
+                    alert('Failed to load config: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
         function changeQty(idx, delta) {
             if (cart[idx]) {
                 cart[idx].qty += delta;
