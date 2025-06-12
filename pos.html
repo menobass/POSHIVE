@@ -61,8 +61,20 @@
     </div>
     <div id="hiveAccountDisplay" style="position:absolute;top:1.5rem;right:2rem;font-size:1.1em;color:#333;background:#fff2;border-radius:6px;padding:0.4em 1em;box-shadow:0 2px 8px #eee;"></div>
     <div id="qrInlineContainer" style="display:none;justify-content:center;margin-top:1.5rem;"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Add QR code library if not already present -->
     <script>
+    if (!window.QRCode) {
+        var script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        document.head.appendChild(script);
+    }
+    </script>
+    <script>
+        // --- Bitcoin Lightning minimum amount check ---
+        function isLightningAmountValid(amount, currency) {
+            // Accept both 'USD' and 'usd' for safety
+            return !(currency === 'USD' || currency === 'usd') || parseFloat(amount) >= 0.25;
+        }
         // Load items from localStorage
         function getItems() {
             return JSON.parse(localStorage.getItem('pos_items') || '[]');
@@ -289,75 +301,162 @@
         }
         // --- Payment Buttons (side by side) ---
         const cartDiv = document.getElementById('cart');
-        const paymentButtonsHtml = `
-        <div id="paymentButtonsRow" style="display:flex;gap:1em;margin-top:1.5em;justify-content:center;">
-          <button id="payWithCashBtn" type="button" style="flex:1 1 0%;background:#f5b041;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;">Pay with Cash</button>
-          <button id="payWithHbdBtn" type="button" style="flex:1 1 0%;background:#27ae60;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;">Pay with HBD</button>
-        </div>
-        <div id="cashPaymentSection" style="display:none;margin-top:1.5em;text-align:center;">
-          <div style="margin-bottom:1em;">
-            <label for="cashGivenInput"><b>Cash Given:</b></label>
-            <input id="cashGivenInput" type="number" min="0" step="0.01" style="width:100px;font-size:1.1em;margin-left:0.5em;" />
-          </div>
-          <div id="changeDueDisplay" style="font-size:1.2em;margin-bottom:1em;"></div>
-          <button id="finishCashSaleBtn" style="background:#27ae60;color:#fff;font-size:1.2em;padding:0.7em 2em;border:none;border-radius:6px;position:relative;right:0;">Finish Sale</button>
-        </div>
-        `;
-        cartDiv.insertAdjacentHTML('afterend', paymentButtonsHtml);
-        // --- Payment Button Logic ---
-        function setupPaymentButtons() {
-          const payWithCashBtn = document.getElementById('payWithCashBtn');
-          const payWithHbdBtn = document.getElementById('payWithHbdBtn');
-          const qrInline = document.getElementById('qrInlineContainer');
-          const cashSection = document.getElementById('cashPaymentSection');
-          const cashInput = document.getElementById('cashGivenInput');
-          const changeDue = document.getElementById('changeDueDisplay');
-          const finishBtn = document.getElementById('finishCashSaleBtn');
-          function getTotal() {
-            return cart.reduce(function(sum, item) { return sum + item.price * item.qty; }, 0);
-          }
-          function showKeychain() {
-            qrInline.style.display = 'flex';
-            cashSection.style.display = 'none';
-          }
-          function showCash() {
-            qrInline.style.display = 'none';
-            cashSection.style.display = 'block';
-            cashInput.value = '';
-            changeDue.textContent = '';
-          }
-          payWithCashBtn.onclick = showCash;
-          payWithHbdBtn.onclick = function() {
-            showKeychain();
-            showQrInline();
-          };
-          if (cashInput) {
-            cashInput.oninput = function() {
-              var given = parseFloat(cashInput.value);
-              var total = getTotal();
-              if (isNaN(given)) { changeDue.textContent = ''; return; }
-              var change = given - total;
-              changeDue.textContent = (change >= 0) ? ('Change Due: $' + change.toFixed(2)) : 'Not enough cash given.';
-            };
-          }
-          if (finishBtn) {
-            finishBtn.onclick = function() {
-              const saleCart = cart.map(i => ({...i}));
-              const saleTotal = saleCart.reduce((sum, i) => sum + i.price * i.qty, 0);
-              cart = [];
-              renderCart();
-              renderMenu();
-              showPostSaleActions('cash', saleCart, saleTotal);
-            };
-          }
-          // Default to Keychain tab
-          showKeychain();
+        function isBitcoinLightningEnabled() {
+            const settings = getStoreSettings();
+            return !!settings.bitcoinLightningEnabled && settings.bitcoinLightningConfig;
         }
-        setupPaymentButtons();
+        function getCartHasItems() {
+            return cart && cart.length > 0;
+        }
+        function renderPaymentButtons() {
+            let html = `<div id="paymentButtonsRow" style="display:flex;gap:1em;margin-top:1.5em;justify-content:center;">`;
+            const cartHasItems = getCartHasItems();
+            html += `<button id="payWithCashBtn" type="button" style="flex:1 1 0%;background:#f5b041;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;" ${cartHasItems ? '' : 'disabled'}>Pay with Cash</button>`;
+            html += `<button id="payWithHbdBtn" type="button" style="flex:1 1 0%;background:#27ae60;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;" ${cartHasItems ? '' : 'disabled'}>Pay with HBD</button>`;
+            if (isBitcoinLightningEnabled()) {
+                html += `<button id="payWithBtcBtn" type="button" style="flex:1 1 0%;background:#f7931a;color:#fff;font-size:1.2em;padding:1em 0.5em;border:none;border-radius:6px;min-width:0;" ${cartHasItems ? '' : 'disabled'}>Bitcoin Lightning</button>`;
+            }
+            html += `</div>`;
+            html += `<div id="cashPaymentSection" style="display:none;margin-top:1.5em;text-align:center;">
+      <div style="margin-bottom:1em;">
+        <label for="cashGivenInput"><b>Cash Given:</b></label>
+        <input id="cashGivenInput" type="number" min="0" step="0.01" style="width:100px;font-size:1.1em;margin-left:0.5em;" />
+      </div>
+      <div id="changeDueDisplay" style="font-size:1.2em;margin-bottom:1em;"></div>
+      <button id="finishCashSaleBtn" style="background:#27ae60;color:#fff;font-size:1.2em;padding:0.7em 2em;border:none;border-radius:6px;position:relative;right:0;">Finish Sale</button>
+    </div>`;
+            // Replace or insert payment buttons
+            let oldRow = document.getElementById('paymentButtonsRow');
+            if (oldRow) oldRow.parentNode.removeChild(oldRow);
+            cartDiv.insertAdjacentHTML('afterend', html);
+        }
+        function setupPaymentButtons() {
+            renderPaymentButtons();
+            const payWithCashBtn = document.getElementById('payWithCashBtn');
+            const payWithHbdBtn = document.getElementById('payWithHbdBtn');
+            const payWithBtcBtn = document.getElementById('payWithBtcBtn');
+            const qrInline = document.getElementById('qrInlineContainer');
+            const cashSection = document.getElementById('cashPaymentSection');
+            const cashInput = document.getElementById('cashGivenInput');
+            const changeDue = document.getElementById('changeDueDisplay');
+            const finishBtn = document.getElementById('finishCashSaleBtn');
+            function getTotal() {
+                return cart.reduce(function(sum, item) { return sum + item.price * item.qty; }, 0);
+            }
+            function showKeychain() {
+                qrInline.style.display = 'flex';
+                cashSection.style.display = 'none';
+            }
+            function showCash() {
+                qrInline.style.display = 'none';
+                cashSection.style.display = 'block';
+                cashInput.value = '';
+                changeDue.textContent = '';
+            }
+            if (payWithCashBtn) payWithCashBtn.onclick = showCash;
+            if (payWithHbdBtn) payWithHbdBtn.onclick = function() {
+                showKeychain();
+                showQrInline();
+            };
+            if (payWithBtcBtn) payWithBtcBtn.onclick = async function() {
+                // Get config
+                const settings = getStoreSettings();
+                const bl = settings.bitcoinLightningConfig;
+                if (!bl) {
+                    alert('Bitcoin Lightning config missing.');
+                    return;
+                }
+                // Calculate total in USD (or use POS currency logic if needed)
+                const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+                if (!total || total <= 0) {
+                    alert('Cart is empty.');
+                    return;
+                }
+                const currency = bl.currency || 'USD';
+                if (!isLightningAmountValid(total, currency)) {
+                    alert('Minimum amount for Bitcoin Lightning is $0.25 USD.');
+                    return;
+                }
+                // --- Generate short memo BEFORE invoice creation ---
+                const shortMemo = `HivePOS-${Math.floor(Math.random()*9000+1000)}`; // 4 random digits for uniqueness
+                window.lastLightningMemo = shortMemo;
+                // Show modal and loading state
+                const modal = document.getElementById('btcLightningQrModal');
+                modal.style.display = 'flex';
+                document.getElementById('btcLightningQrAccount').textContent = 'Receiving: @' + (bl.hive_accname || '');
+                document.getElementById('btcLightningInvoice').textContent = 'Requesting invoice...';
+                const qrDiv = document.getElementById('btcLightningQrCode');
+                qrDiv.innerHTML = '';
+                // Build API call WITH message (memo) set
+                const params = new URLSearchParams({
+                    hive_accname: bl.hive_accname,
+                    amount: total.toFixed(2),
+                    currency: bl.currency,
+                    receive_currency: bl.receive_currency,
+                    usd_hbd: 'false',
+                    app_name: bl.app_name,
+                    expiry: bl.expiry,
+                    message: shortMemo,
+                    qr_code: bl.qr_code
+                });
+                const url = `https://api.v4v.app/v1/new_invoice_hive?${params.toString()}`;
+                try {
+                    const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+                    if (!res.ok) throw new Error('API error: ' + res.status);
+                    const data = await res.json();
+                    if (data.payment_request) {
+                        document.getElementById('btcLightningInvoice').textContent = data.payment_request;
+                        qrDiv.innerHTML = '';
+                        if (window.QRCode) {
+                            new QRCode(qrDiv, {
+                                text: data.payment_request,
+                                width: 220,
+                                height: 220,
+                                colorDark: '#000',
+                                colorLight: '#fff',
+                                correctLevel: window.QRCode.CorrectLevel.H
+                            });
+                        } else {
+                            qrDiv.textContent = 'QR code library not loaded.';
+                        }
+                        // Start Lightning payment listener using the short memo
+                        startLightningPaymentListener(shortMemo);
+                    } else {
+                        document.getElementById('btcLightningInvoice').textContent = 'No invoice received.';
+                        qrDiv.innerHTML = '';
+                    }
+                } catch (err) {
+                    document.getElementById('btcLightningInvoice').textContent = 'Error: ' + err.message;
+                    qrDiv.innerHTML = '';
+                }
+            };
+            if (cashInput) {
+                cashInput.oninput = function() {
+                    var given = parseFloat(cashInput.value);
+                    var total = getTotal();
+                    if (isNaN(given)) { changeDue.textContent = ''; return; }
+                    var change = given - total;
+                    changeDue.textContent = (change >= 0) ? ('Change Due: $' + change.toFixed(2)) : 'Not enough cash given.';
+                };
+            }
+            if (finishBtn) {
+                finishBtn.onclick = function() {
+                    const saleCart = cart.map(i => ({...i}));
+                    const saleTotal = saleCart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                    cart = [];
+                    renderCart();
+                    renderMenu();
+                    showPostSaleActions('cash', saleCart, saleTotal);
+                };
+            }
+            // Default to Keychain tab
+            showKeychain();
+        }
         // --- Initial Render ---
         renderMenu();
         renderCart();
         renderHiveAccount();
+        setupPaymentButtons(); // Ensure payment buttons are rendered on initial load
         // Attach to pay button
         const payBtn = document.querySelector('.pay-btn');
         if (payBtn) payBtn.onclick = showQrInline;
@@ -370,6 +469,17 @@
             oldCashSection[i].remove();
           }
         }
+        // Call setupPaymentButtons after renderMenu and renderCart
+        const originalRenderMenu = renderMenu;
+        renderMenu = function() {
+            originalRenderMenu();
+            setupPaymentButtons();
+        };
+        const originalRenderCart = renderCart;
+        renderCart = function() {
+            originalRenderCart();
+            setupPaymentButtons();
+        };
         // --- Config Source Bar Logic ---
         function setConfigSourceText(text) {
             document.getElementById('configSourceText').textContent = 'Source: ' + text;
@@ -510,6 +620,145 @@
             const cartDiv = document.getElementById('cart');
             cartDiv.parentNode.insertBefore(row, cartDiv.nextSibling);
         }
+
+        // Add ability to X out of the Lightning QR modal
+        function showLightningQrModal(invoice) {
+            // ...existing code to build modal...
+            // Add close (X) button
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '×';
+            closeBtn.setAttribute('aria-label', 'Close');
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.right = '16px';
+            closeBtn.style.top = '16px';
+            closeBtn.style.background = '#fff';
+            closeBtn.style.color = '#f7931a';
+            closeBtn.style.border = 'none';
+            closeBtn.style.fontSize = '2em';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.zIndex = '10';
+            closeBtn.onclick = function() {
+                lightningQrModal.style.display = 'none';
+            };
+            lightningQrModal.style.position = 'relative';
+            lightningQrModal.appendChild(closeBtn);
+            // ...existing code to show QR and invoice string...
+        }
+
+        // Optionally, allow closing modal with ESC or clicking outside
+        (function enhanceLightningModalClose() {
+            // ...get lightningQrModal...
+            document.addEventListener('keydown', function(e) {
+                if (lightningQrModal.style.display === 'block' && (e.key === 'Escape' || e.key === 'Esc')) {
+                    lightningQrModal.style.display = 'none';
+                }
+            });
+            lightningQrModal.addEventListener('click', function(e) {
+                if (e.target === lightningQrModal) {
+                    lightningQrModal.style.display = 'none';
+                }
+            });
+        })();
+    </script>
+    <!-- Bitcoin Lightning QR Modal (required for Lightning payments) -->
+    <div id="btcLightningQrModal" style="display:none;position:fixed;z-index:1000;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.35);align-items:center;justify-content:center;">
+      <div style="background:#fff;padding:2.2em 1.5em 1.5em 1.5em;border-radius:16px;box-shadow:0 8px 32px #0003;max-width:410px;width:95vw;position:relative;display:flex;flex-direction:column;align-items:center;">
+        <button id="btcLightningQrClose" style="position:absolute;top:0.7em;right:0.7em;background:none;border:none;font-size:1.6em;line-height:1;cursor:pointer;color:#e67e22;">×</button>
+        <div id="btcLightningQrAccount" style="font-size:1.15em;margin-bottom:0.7em;text-align:center;"></div>
+        <div id="btcLightningQrCode" style="margin:0 auto 1.2em auto;display:flex;justify-content:center;"></div>
+        <div id="btcLightningInvoice" style="word-break:break-all;font-size:1.02em;background:#f4f4f4;padding:0.7em 0.8em;border-radius:7px;margin-bottom:0.7em;text-align:center;max-width:350px;overflow-wrap:break-word;"></div>
+      </div>
+    </div>
+    
+    <script>
+    // Add Lightning QR modal close logic
+    document.getElementById('closeBtcLightningQr').onclick = function() {
+        document.getElementById('btcLightningQrModal').style.display = 'none';
+    };
+    (function enhanceLightningModalClose() {
+        const modal = document.getElementById('btcLightningQrModal');
+        document.addEventListener('keydown', function(e) {
+            if (modal.style.display === 'flex' && (e.key === 'Escape' || e.key === 'Esc')) {
+                modal.style.display = 'none';
+            }
+        });
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    })();
+    </script>
+    <!-- Bitcoin Lightning Payment Listener -->
+    <script>
+    let lightningPaymentListenerInterval = null;
+    function startLightningPaymentListener(shortMemo) {
+        if (lightningPaymentListenerInterval) clearInterval(lightningPaymentListenerInterval);
+        const settings = getStoreSettings();
+        const bl = settings.bitcoinLightningConfig || {};
+        const hiveAccount = (bl.hive_accname || '').toLowerCase();
+        const statusDiv = document.getElementById('btcLightningInvoice');
+        let attempts = 0;
+        lightningPaymentListenerInterval = setInterval(async function() {
+            attempts++;
+            if (!hiveAccount || !shortMemo) return;
+            try {
+                const response = await fetch('https://api.hive.blog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'condenser_api.get_account_history',
+                        params: [hiveAccount, -1, 50], // fetch more ops for reliability
+                        id: 1
+                    })
+                });
+                const data = await response.json();
+                const history = data.result;
+                for (let i = history.length - 1; i >= 0; i--) {
+                    const op = history[i][1].op;
+                    if (
+                        op[0] === 'transfer' &&
+                        (op[1].to || '').toLowerCase() === hiveAccount &&
+                        (op[1].from || '').toLowerCase() === 'v4vapp' &&
+                        op[1].memo && op[1].memo.toLowerCase().includes(shortMemo.toLowerCase())
+                    ) {
+                        statusDiv.innerHTML = '<span style="color:#27ae60;font-weight:bold;">✅ Bitcoin Lightning payment received!</span>';
+                        clearInterval(lightningPaymentListenerInterval);
+                        lightningPaymentListenerInterval = null;
+                        showLightningPaidNotification();
+                        return;
+                    }
+                }
+                statusDiv.innerHTML = '<span style="color:#f7931a;">⏳ Waiting for Bitcoin Lightning payment confirmation...</span>';
+            } catch (e) {
+                statusDiv.innerHTML = '<span style="color:#e74c3c;">Error checking payment.</span>';
+            }
+            if (attempts > 100) {
+                statusDiv.innerHTML = '<span style="color:#e74c3c;">Payment not detected. Please check manually.</span>';
+                clearInterval(lightningPaymentListenerInterval);
+                lightningPaymentListenerInterval = null;
+            }
+        }, 3000);
+    }
+
+    function showLightningPaidNotification() {
+        // Create notification overlay
+        let notif = document.createElement('div');
+        notif.id = 'lightningPaidNotif';
+        notif.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.45);z-index:2000;display:flex;align-items:center;justify-content:center;';
+        notif.innerHTML = `<div style="background:#fff;padding:2.5em 2em 2em 2em;border-radius:18px;box-shadow:0 8px 32px #0003;max-width:350px;width:90vw;display:flex;flex-direction:column;align-items:center;">
+            <div style='font-size:2.5em;margin-bottom:0.5em;color:#27ae60;'>✅</div>
+            <div style='font-size:1.25em;font-weight:bold;text-align:center;margin-bottom:1em;'>Bitcoin Lightning Payment Confirmed!</div>
+            <button id='closeLightningPaidNotif' style='background:#27ae60;color:#fff;font-size:1.1em;padding:0.7em 2em;border:none;border-radius:8px;cursor:pointer;'>OK</button>
+        </div>`;
+        document.body.appendChild(notif);
+        document.getElementById('closeLightningPaidNotif').onclick = function() {
+            notif.remove();
+            // Refresh app for new sale
+            window.location.reload();
+        };
+    }
     </script>
 </body>
 </html>

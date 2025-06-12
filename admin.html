@@ -78,6 +78,41 @@
         </label>
     </div>
 
+    <!-- Bitcoin Lightning Settings Section -->
+    <div id="bitcoinLightningSettings" style="background:#fffbe6;padding:1rem 1.5rem 1.5rem 1.5rem;margin-bottom:1.5rem;border-radius:8px;box-shadow:0 2px 8px #ffe082;max-width:600px;">
+        <label style="display:flex;align-items:center;gap:0.7em;font-size:1.1em;">
+            <input type="checkbox" id="enableBitcoinLightning">
+            Accept Bitcoin Lightning as payment
+        </label>
+        <form id="bitcoinLightningForm" style="display:none;margin-top:1em;">
+            <label>Hive Account Name:
+                <input type="text" id="bl_hiveAccname" placeholder="e.g. meno">
+            </label>
+            <label>Currency:
+                <input type="text" id="bl_currency" value="USD" readonly>
+            </label>
+            <label>Receive Currency:
+                <select id="bl_receiveCurrency">
+                    <option value="hbd">HBD</option>
+                    <option value="hive">HIVE</option>
+                    <option value="sats">KeepSats</option>
+                </select>
+            </label>
+            <label>App Name:
+                <input type="text" id="bl_appName" value="hivepos" readonly>
+            </label>
+            <label>Expiry (seconds):
+                <input type="number" id="bl_expiry" value="300" readonly>
+            </label>
+            <label>QR Code:
+                <input type="text" id="bl_qrCode" value="none" readonly>
+            </label>
+            <button type="button" id="saveBitcoinLightningBtn" style="margin-top:1.2em;background:#f7931a;">Save Bitcoin Lightning Payment Settings</button>
+            <div id="bl_errorMsg" style="color:#e74c3c;margin-top:0.7em;font-size:1em;"></div>
+        </form>
+    </div>
+
+    <!-- Backup and Restore Configuration Buttons -->
     <script>
         // Utility: Get items from localStorage
         function getItems() {
@@ -451,6 +486,68 @@
         };
         // On page load, show current account
         renderCurrentHiveAccount();
+
+        // --- Bitcoin Lightning Settings Logic ---
+        const enableBL = document.getElementById('enableBitcoinLightning');
+        const blForm = document.getElementById('bitcoinLightningForm');
+        const blError = document.getElementById('bl_errorMsg');
+
+        // Load from store settings
+        function loadBitcoinLightningSettings() {
+            const settings = getStoreSettings();
+            if (settings.bitcoinLightningEnabled) {
+                enableBL.checked = true;
+                blForm.style.display = '';
+                if (settings.bitcoinLightningConfig) {
+                    document.getElementById('bl_hiveAccname').value = settings.bitcoinLightningConfig.hive_accname || '';
+                    document.getElementById('bl_receiveCurrency').value = settings.bitcoinLightningConfig.receive_currency || 'hbd';
+                }
+            } else {
+                enableBL.checked = false;
+                blForm.style.display = 'none';
+            }
+        }
+        enableBL.onchange = function() {
+            blForm.style.display = this.checked ? '' : 'none';
+        };
+        document.getElementById('saveBitcoinLightningBtn').onclick = function() {
+            blError.textContent = '';
+            if (!enableBL.checked) {
+                // If not enabled, just save disabled
+                const settings = getStoreSettings();
+                settings.bitcoinLightningEnabled = false;
+                settings.bitcoinLightningConfig = undefined;
+                saveStoreSettings(settings);
+                alert('Bitcoin Lightning payment disabled.');
+                return;
+            }
+            // Validate fields
+            const hive_accname = document.getElementById('bl_hiveAccname').value.trim();
+            const currency = document.getElementById('bl_currency').value;
+            const receive_currency = document.getElementById('bl_receiveCurrency').value;
+            const app_name = document.getElementById('bl_appName').value;
+            const expiry = document.getElementById('bl_expiry').value;
+            const qr_code = document.getElementById('bl_qrCode').value;
+            if (!hive_accname || !currency || !receive_currency || !app_name || !expiry || !qr_code) {
+                blError.textContent = 'All fields are required.';
+                return;
+            }
+            // Save to store settings
+            const settings = getStoreSettings();
+            settings.bitcoinLightningEnabled = true;
+            settings.bitcoinLightningConfig = {
+                hive_accname,
+                currency,
+                receive_currency,
+                app_name,
+                expiry,
+                qr_code
+            };
+            saveStoreSettings(settings);
+            alert('Bitcoin Lightning payment settings saved!');
+        };
+        // On page load
+        loadBitcoinLightningSettings();
     </script>
 </body>
 </html>
