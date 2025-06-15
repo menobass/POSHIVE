@@ -39,7 +39,10 @@
             <input type="text" id="hiveAccountInput" placeholder="e.g. myshop.hive" autocomplete="off" />
             <button class="update-btn" id="updateAccountBtn">Update</button>
         </div>
-        <div class="current-account" id="currentAccountDisplay">Current: <span id="currentAccount">none</span></div>
+        <div class="current-account" id="currentAccountDisplay">
+            <span id="currentAccountAvatar" style="vertical-align:middle;display:inline-block;width:32px;height:32px;border-radius:50%;background:#eee;overflow:hidden;margin-right:0.5em;"></span>
+            Current: <span id="currentAccount">none</span>
+        </div>
         <label for="amountInput">Amount (HBD)</label>
         <input type="number" id="amountInput" class="amount-input" min="0.01" step="0.01" placeholder="0.00" />
         <button class="generate-btn" id="generateQrBtn">Generate QR</button>
@@ -70,6 +73,7 @@
     const hiveAccountInput = document.getElementById('hiveAccountInput');
     const updateAccountBtn = document.getElementById('updateAccountBtn');
     const currentAccount = document.getElementById('currentAccount');
+    const currentAccountAvatar = document.getElementById('currentAccountAvatar');
     const amountInput = document.getElementById('amountInput');
     const generateQrBtn = document.getElementById('generateQrBtn');
     const qrContainer = document.getElementById('qrContainer');
@@ -81,6 +85,12 @@
     function renderCurrentAccount() {
         const acc = getStoredAccount();
         currentAccount.textContent = acc ? acc : 'none';
+        if (acc) {
+            const imgUrl = `https://images.hive.blog/u/${acc.toLowerCase()}/avatar`;
+            currentAccountAvatar.innerHTML = `<img src="${imgUrl}" alt="avatar" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;" onerror=\"this.onerror=null;this.src='https://images.hive.blog/u/ecency/avatar';\">`;
+        } else {
+            currentAccountAvatar.innerHTML = '';
+        }
     }
     renderCurrentAccount();
     // --- Update account logic ---
