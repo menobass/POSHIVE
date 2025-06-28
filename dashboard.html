@@ -839,7 +839,6 @@
                         <thead>
                             <tr>
                                 <th>Username</th>
-                                <th>Name</th>
                                 <th>Store Access</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -875,24 +874,14 @@
                     <input type="text" class="form-control" id="cashierUsername" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="cashierName">Full Name</label>
-                    <input type="text" class="form-control" id="cashierName" required>
-                </div>
-                <div class="form-group">
                     <label class="form-label" for="cashierPassword">Password</label>
                     <input type="password" class="form-control" id="cashierPassword" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Store Access</label>
-                    <div id="storeAccessList">
-                        <!-- Store checkboxes will be loaded here -->
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeCashierModal()">Cancel</button>
                     <button type="submit" class="btn btn-success" id="saveCashierBtn">
                         <span class="spinner" style="display: none;"></span>
-                        Save Cashier
+                        Confirm
                     </button>
                 </div>
             </form>
@@ -1005,7 +994,7 @@
 
         async function loadCashiers() {
             try {
-                const response = await fetch(`${API_BASE_URL}/cashiers`, {
+                const response = await fetch(`${API_BASE_URL}/users`, {
                     method: 'GET',
                     headers: getAuthHeaders()
                 });
@@ -1037,7 +1026,7 @@
                     }
                 } else {
                     // Other errors - treat as no cashiers but log the error
-                    console.warn(`Cashiers API returned ${response.status}, treating as no cashiers`);
+                    console.warn(`Users API returned ${response.status}, treating as no cashiers`);
                     cashiers = [];
                     renderCashiers();
                 }
@@ -1142,57 +1131,24 @@
             tableBody.innerHTML = cashiers.map(cashier => `
                 <tr>
                     <td>${escapeHtml(cashier.username)}</td>
-                    <td>${escapeHtml(cashier.name)}</td>
                     <td>
-                        ${(cashier.storeAccess || []).map(storeId => {
-                            // Check if the store ID matches the user's store
-                            const userStoreId = userStore?._id || userStore?.id || userStore?.storeId || 'default';
-                            if (userStore && storeId === userStoreId) {
-                                const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
-                                return `<span class="badge badge-success">${escapeHtml(storeName)}</span>`;
-                            }
-                            return `<span class="badge badge-warning">Unknown Store</span>`;
-                        }).join(' ')}
+                        <span class="badge badge-success">${escapeHtml(userStore?.settings?.businessName || userStore?.businessName || userStore?.name || 'Current Store')}</span>
                     </td>
                     <td>
-                        <span class="badge ${cashier.active ? 'badge-success' : 'badge-warning'}">
-                            ${cashier.active ? 'Active' : 'Inactive'}
-                        </span>
+                        <span class="badge badge-success">Active</span>
                     </td>
                     <td>
                         <div class="actions">
-                            <button class="btn btn-primary btn-sm" onclick="editCashier('${cashier.id}')">
+                            <button class="btn btn-primary btn-sm" onclick="editCashier('${cashier._id || cashier.id}')">
                                 ✏️ Edit
                             </button>
-                            <button class="btn btn-warning btn-sm" onclick="resetCashierPassword('${cashier.id}')">
-                                🔑 Reset Password
-                            </button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteCashier('${cashier.id}')">
+                            <button class="btn btn-danger btn-sm" onclick="deleteCashier('${cashier._id || cashier.id}')">
                                 🗑️ Delete
                             </button>
                         </div>
                     </td>
                 </tr>
             `).join('');
-        }
-
-        function renderStoreAccessList() {
-            const container = document.getElementById('storeAccessList');
-            
-            if (!userStore) {
-                container.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">No store available. Create a store first.</p>';
-                return;
-            }
-
-            const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
-            const storeId = userStore._id || userStore.id || userStore.storeId || 'default';
-            
-            container.innerHTML = `
-                <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    <input type="checkbox" name="storeAccess" value="${storeId}" checked>
-                    ${escapeHtml(storeName)}
-                </label>
-            `;
         }
 
         // Store functions
@@ -1219,7 +1175,6 @@
             document.getElementById('cashierModalTitle').textContent = 'Add New Cashier';
             document.getElementById('cashierForm').reset();
             document.getElementById('cashierId').value = '';
-            renderStoreAccessList();
             document.getElementById('cashierModal').classList.add('show');
         }
 
@@ -1228,23 +1183,15 @@
         }
 
         function editCashier(cashierId) {
-            const cashier = cashiers.find(c => c.id === cashierId);
+            const cashier = cashiers.find(c => (c._id || c.id) === cashierId);
             if (!cashier) return;
 
             document.getElementById('cashierModalTitle').textContent = 'Edit Cashier';
-            document.getElementById('cashierId').value = cashier.id;
+            document.getElementById('cashierId').value = cashier._id || cashier.id;
             document.getElementById('cashierUsername').value = cashier.username;
-            document.getElementById('cashierName').value = cashier.name;
             document.getElementById('cashierPassword').value = '';
             document.getElementById('cashierPassword').placeholder = 'Leave blank to keep current password';
-            
-            renderStoreAccessList();
-            
-            // Check the appropriate store access checkboxes
-            const checkboxes = document.querySelectorAll('input[name="storeAccess"]');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = (cashier.storeAccess || []).includes(checkbox.value);
-            });
+            document.getElementById('cashierPassword').required = false;
 
             document.getElementById('cashierModal').classList.add('show');
         }
@@ -1261,24 +1208,31 @@
 
                 const cashierId = document.getElementById('cashierId').value;
                 const username = document.getElementById('cashierUsername').value.trim();
-                const name = document.getElementById('cashierName').value.trim();
                 const password = document.getElementById('cashierPassword').value;
-                
-                const checkedBoxes = document.querySelectorAll('input[name="storeAccess"]:checked');
-                const storeAccess = Array.from(checkedBoxes).map(cb => cb.value);
+
+                // Validate required fields
+                if (!username) {
+                    throw new Error('Username is required');
+                }
+
+                if (!cashierId && !password) {
+                    throw new Error('Password is required for new cashiers');
+                }
+
+                if (!userStore || !userStore._id) {
+                    throw new Error('No store available. Please create a store first.');
+                }
 
                 const cashierData = {
                     username,
-                    name,
-                    storeAccess,
-                    active: true
+                    storeId: userStore._id
                 };
 
                 if (password) {
                     cashierData.password = password;
                 }
 
-                const url = cashierId ? `${API_BASE_URL}/cashiers/${cashierId}` : `${API_BASE_URL}/cashiers`;
+                const url = cashierId ? `${API_BASE_URL}/users/${cashierId}` : `${API_BASE_URL}/users`;
                 const method = cashierId ? 'PUT' : 'POST';
 
                 const response = await fetch(url, {
@@ -1292,8 +1246,15 @@
                     closeCashierModal();
                     await loadCashiers();
                 } else {
-                    const error = await response.text();
-                    throw new Error(error || 'Failed to save cashier');
+                    const errorText = await response.text();
+                    let errorMessage;
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.message || errorText;
+                    } catch {
+                        errorMessage = errorText || 'Failed to save cashier';
+                    }
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 console.error('Error saving cashier:', error);
@@ -1304,36 +1265,14 @@
             }
         }
 
-        async function resetCashierPassword(cashierId) {
-            const newPassword = prompt('Enter new password for cashier:');
-            if (!newPassword) return;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/cashiers/${cashierId}/password`, {
-                    method: 'PUT',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({ password: newPassword })
-                });
-
-                if (response.ok) {
-                    showToast('Password reset successfully', 'success');
-                } else {
-                    throw new Error('Failed to reset password');
-                }
-            } catch (error) {
-                console.error('Error resetting password:', error);
-                showToast('Failed to reset password', 'error');
-            }
-        }
-
         async function deleteCashier(cashierId) {
-            const cashier = cashiers.find(c => c.id === cashierId);
+            const cashier = cashiers.find(c => (c._id || c.id) === cashierId);
             if (!cashier) return;
 
-            if (!confirm(`Are you sure you want to delete cashier "${cashier.name}"?`)) return;
+            if (!confirm(`Are you sure you want to delete cashier "${cashier.username}"?`)) return;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/cashiers/${cashierId}`, {
+                const response = await fetch(`${API_BASE_URL}/users/${cashierId}`, {
                     method: 'DELETE',
                     headers: getAuthHeaders()
                 });
@@ -1342,11 +1281,19 @@
                     showToast('Cashier deleted successfully', 'success');
                     await loadCashiers();
                 } else {
-                    throw new Error('Failed to delete cashier');
+                    const errorText = await response.text();
+                    let errorMessage;
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.message || errorText;
+                    } catch {
+                        errorMessage = errorText || 'Failed to delete cashier';
+                    }
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 console.error('Error deleting cashier:', error);
-                showToast('Failed to delete cashier', 'error');
+                showToast(error.message || 'Failed to delete cashier', 'error');
             }
         }
 
