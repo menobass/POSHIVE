@@ -186,14 +186,90 @@
         .store-display {
             border: 2px solid var(--border-color);
             border-radius: var(--border-radius);
-            padding: 2rem;
             background: var(--white);
             transition: var(--transition);
+            overflow: hidden;
         }
 
         .store-display:hover {
             border-color: var(--primary-color);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Store banner */
+        .store-banner {
+            position: relative;
+            height: 200px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            overflow: hidden;
+        }
+
+        .store-banner:hover {
+            transform: scale(1.02);
+        }
+
+        .store-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            transition: var(--transition);
+        }
+
+        .store-banner:hover::before {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .store-banner-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            color: white;
+        }
+
+        .store-banner-name {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 0.5rem;
+        }
+
+        .store-banner-status {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .store-banner-status.published {
+            background: rgba(40, 167, 69, 0.8);
+            border-color: rgba(40, 167, 69, 0.9);
+        }
+
+        .store-banner-status.draft {
+            background: rgba(243, 156, 18, 0.8);
+            border-color: rgba(243, 156, 18, 0.9);
+        }
+
+        .store-content {
+            padding: 2rem;
         }
 
         .store-header {
@@ -535,6 +611,29 @@
 
             .form-row {
                 grid-template-columns: 1fr;
+            }
+
+            /* Store banner responsive */
+            .store-banner {
+                height: 150px;
+            }
+
+            .store-banner-name {
+                font-size: 1.8rem;
+            }
+
+            .store-banner-status {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+
+            .store-content {
+                padding: 1rem;
+            }
+
+            .store-metrics {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
             }
         }
 
@@ -962,6 +1061,12 @@
             const storeStatus = userStore.published ? 'Published' : 'Draft';
             const statusClass = userStore.published ? 'published' : 'draft';
 
+            // Get banner image from store config
+            const bannerImage = userStore.settings?.bannerImage || userStore.bannerImage || null;
+            const bannerStyle = bannerImage ? 
+                `background-image: url('${bannerImage}');` : 
+                `background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));`;
+
             // Metrics - can now pull from config or store data
             const itemsCount = userStore.items?.length || userStore.itemCount || 0;
             const cashiersCount = cashiers.length || 0;
@@ -970,30 +1075,32 @@
 
             storeDisplay.innerHTML = `
                 <div class="store-display">
-                    <div class="store-header">
-                        <div class="store-info">
-                            <h3>${escapeHtml(storeName)}</h3>
-                            <div class="store-status ${statusClass}">
+                    <div class="store-banner" style="${bannerStyle}" onclick="editStore()" title="Click to edit store">
+                        <div class="store-banner-content">
+                            <h1 class="store-banner-name">${escapeHtml(storeName)}</h1>
+                            <div class="store-banner-status ${statusClass}">
                                 ${storeStatus}
                             </div>
                         </div>
                     </div>
-                    <div class="store-metrics">
-                        <div class="metric-card">
-                            <div class="metric-number">${itemsCount}</div>
-                            <div class="metric-label">Items</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-number">${cashiersCount}</div>
-                            <div class="metric-label">Cashiers</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-number">$${totalSales.toFixed(2)}</div>
-                            <div class="metric-label">Total Sales</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-number">${todayOrders}</div>
-                            <div class="metric-label">Today's Orders</div>
+                    <div class="store-content">
+                        <div class="store-metrics">
+                            <div class="metric-card">
+                                <div class="metric-number">${itemsCount}</div>
+                                <div class="metric-label">Items</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-number">${cashiersCount}</div>
+                                <div class="metric-label">Cashiers</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-number">$${totalSales.toFixed(2)}</div>
+                                <div class="metric-label">Total Sales</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-number">${todayOrders}</div>
+                                <div class="metric-label">Today's Orders</div>
+                            </div>
                         </div>
                     </div>
                 </div>
