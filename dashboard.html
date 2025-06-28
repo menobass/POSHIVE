@@ -1125,24 +1125,14 @@
                 tableBody.closest('.table-container').style.display = 'none';
                 emptyState.style.display = 'block';
                 
-                // Update the empty state message based on store availability
-                if (!userStore) {
-                    emptyState.innerHTML = `
-                        <h3>No Store Available</h3>
-                        <p>Create your store first to manage cashiers</p>
-                        <button class="btn btn-primary" onclick="createNewStore()">
-                            ➕ Create Your Store
-                        </button>
-                    `;
-                } else {
-                    emptyState.innerHTML = `
-                        <h3>No Cashiers Assigned</h3>
-                        <p>No cashiers are currently assigned to your store</p>
-                        <button class="btn btn-success" onclick="openAddCashierModal()">
-                            👤 Add Your First Cashier
-                        </button>
-                    `;
-                }
+                // Always show cashier-focused empty state regardless of store availability
+                emptyState.innerHTML = `
+                    <h3>No Cashiers Assigned</h3>
+                    <p>No cashiers are currently assigned to your store</p>
+                    <button class="btn btn-success" onclick="openAddCashierModal()">
+                        👤 Add Your First Cashier
+                    </button>
+                `;
                 return;
             }
 
