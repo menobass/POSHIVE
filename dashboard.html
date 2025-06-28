@@ -1015,28 +1015,37 @@
                     cashiers = Array.isArray(data) ? data : [];
                     renderCashiers();
                 } else if (response.status === 404) {
+                    // No cashiers found
                     cashiers = [];
                     renderCashiers();
                 } else if (response.status === 400) {
-                    // Handle "No store assigned to user" case
+                    // Handle "No store assigned to user" case or other 400 errors
                     try {
                         const errorData = await response.json();
-                        if (errorData.message === "No store assigned to user") {
+                        if (errorData.message === "No store assigned to user" || errorData.message?.includes("No store")) {
                             cashiers = [];
                             renderCashiers();
                         } else {
-                            throw new Error(`Failed to load cashiers: ${response.status} - ${errorData.message || 'Unknown error'}`);
+                            // Other 400 errors - treat as no cashiers for now
+                            cashiers = [];
+                            renderCashiers();
                         }
                     } catch (parseError) {
-                        // If we can't parse the JSON, assume it's not the "no store" case
-                        throw new Error(`Failed to load cashiers: ${response.status}`);
+                        // If we can't parse the JSON, treat as no cashiers
+                        cashiers = [];
+                        renderCashiers();
                     }
                 } else {
-                    throw new Error(`Failed to load cashiers: ${response.status}`);
+                    // Other errors - treat as no cashiers but log the error
+                    console.warn(`Cashiers API returned ${response.status}, treating as no cashiers`);
+                    cashiers = [];
+                    renderCashiers();
                 }
             } catch (error) {
                 console.error('Error loading cashiers:', error);
-                showToast('Failed to load cashiers', 'error');
+                // Network or other errors - treat as no cashiers
+                cashiers = [];
+                renderCashiers();
             }
         }
 
@@ -1115,6 +1124,25 @@
             if (cashiers.length === 0) {
                 tableBody.closest('.table-container').style.display = 'none';
                 emptyState.style.display = 'block';
+                
+                // Update the empty state message based on store availability
+                if (!userStore) {
+                    emptyState.innerHTML = `
+                        <h3>No Store Available</h3>
+                        <p>Create your store first to manage cashiers</p>
+                        <button class="btn btn-primary" onclick="createNewStore()">
+                            ➕ Create Your Store
+                        </button>
+                    `;
+                } else {
+                    emptyState.innerHTML = `
+                        <h3>No Cashiers Assigned</h3>
+                        <p>No cashiers are currently assigned to your store</p>
+                        <button class="btn btn-success" onclick="openAddCashierModal()">
+                            👤 Add Your First Cashier
+                        </button>
+                    `;
+                }
                 return;
             }
 
@@ -1128,7 +1156,7 @@
                     <td>
                         ${(cashier.storeAccess || []).map(storeId => {
                             // Check if the store ID matches the user's store
-                            const userStoreId = userStore?.id || userStore?.storeId || 'default';
+                            const userStoreId = userStore?._id || userStore?.id || userStore?.storeId || 'default';
                             if (userStore && storeId === userStoreId) {
                                 const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
                                 return `<span class="badge badge-success">${escapeHtml(storeName)}</span>`;
@@ -1167,7 +1195,7 @@
             }
 
             const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
-            const storeId = userStore.id || userStore.storeId || 'default';
+            const storeId = userStore._id || userStore.id || userStore.storeId || 'default';
             
             container.innerHTML = `
                 <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
