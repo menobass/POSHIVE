@@ -114,21 +114,135 @@
 
     <!-- Backup and Restore Configuration Buttons -->
     <script>
-        // Utility: Get items from localStorage
-        function getItems() {
+        // API Configuration
+        const API_BASE_URL = 'https://hive-pos-backend.onrender.com/api';
+
+        // Authentication helper
+        function getAuthToken() {
+            return localStorage.getItem('pos_admin_token');
+        }
+
+        function getAuthHeaders() {
+            const token = getAuthToken();
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // Check authentication
+        function checkAuth() {
+            const token = getAuthToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return false;
+            }
+            return true;
+        }
+
+        // API Functions
+        async function loadConfigFromAPI() {
+            try {
+                console.log('Loading config from API...');
+                const response = await fetch(`${API_BASE_URL}/config`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const config = await response.json();
+                    console.log('Config loaded from API:', config);
+                    
+                    // Save to localStorage as cache
+                    if (config.items) {
+                        localStorage.setItem('pos_items', JSON.stringify(config.items));
+                    }
+                    if (config.settings) {
+                        localStorage.setItem('pos_settings', JSON.stringify(config.settings));
+                    }
+                    
+                    return config;
+                } else if (response.status === 404) {
+                    // No config exists, start with fresh store
+                    console.log('No config found, starting with fresh store');
+                    return null;
+                } else {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Failed to load config from API:', error);
+                // Fall back to localStorage
+                console.log('Falling back to localStorage');
+                return null;
+            }
+        }
+
+        async function saveConfigToAPI(config) {
+            try {
+                console.log('Saving config to API:', config);
+                const response = await fetch(`${API_BASE_URL}/stores`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Config saved to API successfully:', result);
+                    return true;
+                } else {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Failed to save config to API:', error);
+                return false;
+            }
+        }
+
+        // Enhanced data functions with API integration
+        async function getItems() {
             return JSON.parse(localStorage.getItem('pos_items') || '[]');
         }
-        // Utility: Save items to localStorage
-        function saveItems(items) {
+
+        async function saveItems(items) {
+            // Save to localStorage immediately for UI responsiveness
             localStorage.setItem('pos_items', JSON.stringify(items));
+            
+            // Also save to API
+            const settings = getStoreSettings();
+            const config = {
+                items: items,
+                settings: settings
+            };
+            
+            await saveConfigToAPI(config);
+        }
+
+        async function getStoreSettings() {
+            return JSON.parse(localStorage.getItem('pos_settings') || '{"businessName":"","bannerUrl":"","categories":["drink","pastry","bread","other"],"hiveAccount":""}');
+        }
+
+        async function saveStoreSettings(settings) {
+            // Save to localStorage immediately for UI responsiveness
+            localStorage.setItem('pos_settings', JSON.stringify(settings));
+            
+            // Also save to API
+            const items = await getItems();
+            const config = {
+                items: items,
+                settings: settings
+            };
+            
+            await saveConfigToAPI(config);
         }
         // Utility: Generate unique ID
         function generateId() {
             return 'item-' + Date.now() + '-' + Math.floor(Math.random()*10000);
         }
+
         // Render items list
-        function renderItems() {
-            const items = getItems();
+        async function renderItems() {
+            const items = await getItems();
             const list = document.getElementById('itemsList');
             list.innerHTML = '';
             items.forEach(item => {
@@ -147,15 +261,16 @@
                 list.appendChild(card);
             });
         }
+
         // Add or update item
-        document.getElementById('itemForm').onsubmit = function(e) {
+        document.getElementById('itemForm').onsubmit = async function(e) {
             e.preventDefault();
             const id = document.getElementById('itemId').value;
             const name = document.getElementById('itemName').value.trim();
             const category = document.getElementById('itemCategory').value;
             const image = document.getElementById('itemImage').value.trim();
             const price = parseFloat(document.getElementById('itemPrice').value);
-            let items = getItems();
+            let items = await getItems();
             if (id) {
                 // Edit mode
                 items = items.map(item => item.id === id ? { ...item, name, category, image, price } : item);
@@ -163,16 +278,17 @@
                 // Add mode
                 items.push({ id: generateId(), name, category, image, price });
             }
-            saveItems(items);
+            await saveItems(items);
             this.reset();
             document.getElementById('itemId').value = '';
             document.getElementById('saveBtn').textContent = 'Add Item';
             document.getElementById('cancelEditBtn').style.display = 'none';
             renderItems();
         };
+
         // Edit item
-        window.editItem = function(id) {
-            const items = getItems();
+        window.editItem = async function(id) {
+            const items = await getItems();
             const item = items.find(i => i.id === id);
             if (!item) return;
             document.getElementById('itemId').value = item.id;
@@ -192,11 +308,11 @@
             this.style.display = 'none';
         };
         // Delete item
-        window.deleteItem = function(id) {
+        window.deleteItem = async function(id) {
             if (!confirm('Delete this item?')) return;
-            let items = getItems();
+            let items = await getItems();
             items = items.filter(item => item.id !== id);
-            saveItems(items);
+            await saveItems(items);
             renderItems();
         };
         // Image selection logic
@@ -240,14 +356,8 @@
         };
 
         // --- Store Settings Logic ---
-        function getStoreSettings() {
-            return JSON.parse(localStorage.getItem('pos_settings') || '{"businessName":"","bannerUrl":"","categories":["drink","pastry","bread","other"],"hiveAccount":""}');
-        }
-        function saveStoreSettings(settings) {
-            localStorage.setItem('pos_settings', JSON.stringify(settings));
-        }
-        function renderStoreSettings() {
-            const settings = getStoreSettings();
+        async function renderStoreSettings() {
+            const settings = await getStoreSettings();
             document.getElementById('businessName').value = settings.businessName || '';
             document.getElementById('bannerUrl').value = settings.bannerUrl || '';
             document.getElementById('hiveAccount').value = settings.hiveAccount || '';
@@ -263,10 +373,10 @@
                 const x = document.createElement('button');
                 x.textContent = '×';
                 x.style = 'background:none;border:none;color:#e74c3c;font-size:1.1em;cursor:pointer;margin-left:0.3em;';
-                x.onclick = () => {
-                    const settings = getStoreSettings();
+                x.onclick = async () => {
+                    const settings = await getStoreSettings();
                     settings.categories.splice(idx, 1);
-                    saveStoreSettings(settings);
+                    await saveStoreSettings(settings);
                     renderStoreSettings();
                     renderCategoryOptions();
                 };
@@ -274,47 +384,48 @@
                 tagDiv.appendChild(tag);
             });
         }
-        document.getElementById('categoryInput').addEventListener('keydown', function(e) {
+        document.getElementById('categoryInput').addEventListener('keydown', async function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const val = this.value.trim();
                 if (!val) return;
-                const settings = getStoreSettings();
+                const settings = await getStoreSettings();
                 if (!settings.categories.includes(val)) {
                     settings.categories.push(val);
-                    saveStoreSettings(settings);
+                    await saveStoreSettings(settings);
                     renderStoreSettings();
                     renderCategoryOptions();
                 }
                 this.value = '';
             }
         });
-        document.getElementById('businessName').addEventListener('input', function() {
-            const settings = getStoreSettings();
+        document.getElementById('businessName').addEventListener('input', async function() {
+            const settings = await getStoreSettings();
             settings.businessName = this.value;
-            saveStoreSettings(settings);
+            await saveStoreSettings(settings);
         });
-        document.getElementById('bannerUrl').addEventListener('input', function() {
-            const settings = getStoreSettings();
+        document.getElementById('bannerUrl').addEventListener('input', async function() {
+            const settings = await getStoreSettings();
             settings.bannerUrl = this.value;
-            saveStoreSettings(settings);
+            await saveStoreSettings(settings);
         });
-        document.getElementById('hiveAccount').addEventListener('input', function() {
-            const settings = getStoreSettings();
+        document.getElementById('hiveAccount').addEventListener('input', async function() {
+            const settings = await getStoreSettings();
             settings.hiveAccount = this.value;
-            saveStoreSettings(settings);
+            await saveStoreSettings(settings);
+        });
         });
 
         // Add button logic for category add
         const addCategoryBtn = document.getElementById('addCategoryBtn');
         const categoryInput = document.getElementById('categoryInput');
-        addCategoryBtn.onclick = function() {
+        addCategoryBtn.onclick = async function() {
             const val = categoryInput.value.trim();
             if (!val) return;
-            const settings = getStoreSettings();
+            const settings = await getStoreSettings();
             if (!settings.categories.includes(val)) {
                 settings.categories.push(val);
-                saveStoreSettings(settings);
+                await saveStoreSettings(settings);
                 renderStoreSettings();
                 renderCategoryOptions();
             }
@@ -343,13 +454,13 @@
                     body: formData
                 })
                 .then(res => res.json())
-                .then(data => {
+                .then(async data => {
                     if (data.success && data.data && data.data.link) {
                         bannerUrlInput.value = data.data.link;
                         // Save to store settings
-                        const settings = getStoreSettings();
+                        const settings = await getStoreSettings();
                         settings.bannerUrl = bannerUrlInput.value;
-                        saveStoreSettings(settings);
+                        await saveStoreSettings(settings);
                     } else {
                         bannerUrlInput.value = '';
                         alert('Banner upload failed.');
@@ -363,19 +474,53 @@
         };
 
         // --- Category select in item form ---
-        function renderCategoryOptions() {
-            const settings = getStoreSettings();
+        async function renderCategoryOptions() {
+            const settings = await getStoreSettings();
             const select = document.getElementById('itemCategory');
             const current = select.value;
             select.innerHTML = '<option value="">Select category</option>' +
                 (settings.categories || []).map(cat => `<option value="${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</option>`).join('');
             select.value = current;
         }
-        // Call on page load
-        renderStoreSettings();
-        renderCategoryOptions();
-        // Initial render
-        renderItems();
+
+        // Initialize application
+        async function initializeApp() {
+            // Check authentication first
+            if (!checkAuth()) return;
+
+            try {
+                // Try to load config from API
+                const apiConfig = await loadConfigFromAPI();
+                
+                if (apiConfig) {
+                    console.log('Loaded config from API');
+                    // Config was loaded from API, data is already in localStorage
+                } else {
+                    console.log('No API config found, using localStorage or starting fresh');
+                    // Either no config exists on server, or API failed - use localStorage
+                }
+
+                // Render the UI
+                await renderStoreSettings();
+                await renderCategoryOptions();
+                await renderItems();
+                await renderCurrentHiveAccount();
+                await loadBitcoinLightningSettings();
+                
+                console.log('App initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize app:', error);
+                // If everything fails, just render what's in localStorage
+                await renderStoreSettings();
+                await renderCategoryOptions();
+                await renderItems();
+                await renderCurrentHiveAccount();
+                await loadBitcoinLightningSettings();
+            }
+        }
+
+        // Call initialization when page loads
+        initializeApp();
 
         // --- Backup Configuration Logic ---
         const backupBtn = document.createElement('button');
@@ -469,19 +614,19 @@
         const updateHiveAccountBtn = document.getElementById('updateHiveAccountBtn');
         const hiveAccountInput = document.getElementById('hiveAccount');
         const currentHiveAccountDisplay = document.getElementById('currentHiveAccountDisplay');
-        function renderCurrentHiveAccount() {
-            const settings = getStoreSettings();
+        async function renderCurrentHiveAccount() {
+            const settings = await getStoreSettings();
             if (settings.hiveAccount) {
                 currentHiveAccountDisplay.textContent = `Current: @${settings.hiveAccount}`;
             } else {
                 currentHiveAccountDisplay.textContent = 'No account set.';
             }
         }
-        updateHiveAccountBtn.onclick = function() {
+        updateHiveAccountBtn.onclick = async function() {
             const val = hiveAccountInput.value.trim();
-            const settings = getStoreSettings();
+            const settings = await getStoreSettings();
             settings.hiveAccount = val;
-            saveStoreSettings(settings);
+            await saveStoreSettings(settings);
             renderCurrentHiveAccount();
         };
         // On page load, show current account
@@ -493,8 +638,8 @@
         const blError = document.getElementById('bl_errorMsg');
 
         // Load from store settings
-        function loadBitcoinLightningSettings() {
-            const settings = getStoreSettings();
+        async function loadBitcoinLightningSettings() {
+            const settings = await getStoreSettings();
             if (settings.bitcoinLightningEnabled) {
                 enableBL.checked = true;
                 blForm.style.display = '';
@@ -510,14 +655,14 @@
         enableBL.onchange = function() {
             blForm.style.display = this.checked ? '' : 'none';
         };
-        document.getElementById('saveBitcoinLightningBtn').onclick = function() {
+        document.getElementById('saveBitcoinLightningBtn').onclick = async function() {
             blError.textContent = '';
             if (!enableBL.checked) {
                 // If not enabled, just save disabled
-                const settings = getStoreSettings();
+                const settings = await getStoreSettings();
                 settings.bitcoinLightningEnabled = false;
                 settings.bitcoinLightningConfig = undefined;
-                saveStoreSettings(settings);
+                await saveStoreSettings(settings);
                 alert('Bitcoin Lightning payment disabled.');
                 return;
             }
@@ -533,7 +678,7 @@
                 return;
             }
             // Save to store settings
-            const settings = getStoreSettings();
+            const settings = await getStoreSettings();
             settings.bitcoinLightningEnabled = true;
             settings.bitcoinLightningConfig = {
                 hive_accname,
@@ -543,11 +688,9 @@
                 expiry,
                 qr_code
             };
-            saveStoreSettings(settings);
+            await saveStoreSettings(settings);
             alert('Bitcoin Lightning payment settings saved!');
         };
-        // On page load
-        loadBitcoinLightningSettings();
     </script>
 </body>
 </html>
