@@ -881,6 +881,20 @@
                 } else if (response.status === 404) {
                     userStore = null;
                     renderStore();
+                } else if (response.status === 400) {
+                    // Handle "No store assigned to user" case
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.message === "No store assigned to user") {
+                            userStore = null;
+                            renderStore();
+                        } else {
+                            throw new Error(`Failed to load store config: ${response.status} - ${errorData.message || 'Unknown error'}`);
+                        }
+                    } catch (parseError) {
+                        // If we can't parse the JSON, assume it's not the "no store" case
+                        throw new Error(`Failed to load store config: ${response.status}`);
+                    }
                 } else {
                     throw new Error(`Failed to load store config: ${response.status}`);
                 }
@@ -904,6 +918,20 @@
                 } else if (response.status === 404) {
                     cashiers = [];
                     renderCashiers();
+                } else if (response.status === 400) {
+                    // Handle "No store assigned to user" case
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.message === "No store assigned to user") {
+                            cashiers = [];
+                            renderCashiers();
+                        } else {
+                            throw new Error(`Failed to load cashiers: ${response.status} - ${errorData.message || 'Unknown error'}`);
+                        }
+                    } catch (parseError) {
+                        // If we can't parse the JSON, assume it's not the "no store" case
+                        throw new Error(`Failed to load cashiers: ${response.status}`);
+                    }
                 } else {
                     throw new Error(`Failed to load cashiers: ${response.status}`);
                 }
