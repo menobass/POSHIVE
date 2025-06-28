@@ -597,7 +597,7 @@
                     
                     // Redirect to admin page after a short delay
                     setTimeout(() => {
-                        window.location.href = 'admin.html';
+                        window.location.href = 'dashboard.html';
                     }, 1500);
                 } else {
                     showError(data.message || 'Login failed. Please check your credentials.');
@@ -713,7 +713,7 @@
             if (token) {
                 // Optionally verify token with server
                 // For now, just redirect if token exists
-                window.location.href = 'admin.html';
+                window.location.href = 'dashboard.html';
             }
         }
 

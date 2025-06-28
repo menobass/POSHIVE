@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIVE POS Administration Console</title>
+    <style>
+        /* CSS Variables for consistent theming */
+        :root {
+            --primary-color: #b5651d;
+            --primary-hover: #9d5419;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --danger-color: #e74c3c;
+            --danger-hover: #c0392b;
+            --warning-color: #f39c12;
+            --warning-hover: #e67e22;
+            --info-color: #007bff;
+            --info-hover: #0056b3;
+            --light-bg: #f8f8f8;
+            --white: #ffffff;
+            --border-color: #dee2e6;
+            --text-muted: #6c757d;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        /* Reset and base styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: var(--light-bg);
+            min-height: 100vh;
+        }
+
+        /* Header styles */
+        .header {
+            background: var(--white);
+            box-shadow: var(--shadow);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .username {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Button styles */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: var(--white);
+        }
+
+        .btn-success:hover {
+            background: var(--success-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: var(--white);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: var(--white);
+        }
+
+        .btn-warning:hover {
+            background: var(--warning-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        /* Main content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Section styles */
+        .section {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+        }
+
+        .section-content {
+            padding: 2rem;
+        }
+
+        /* Store grid */
+        .stores-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .store-card {
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            background: var(--white);
+        }
+
+        .store-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .store-card.new-store {
+            border: 2px dashed var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            text-align: center;
+        }
+
+        .store-card.new-store:hover {
+            background: rgba(181, 101, 29, 0.05);
+        }
+
+        .store-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .store-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .store-status.published {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success-color);
+        }
+
+        .store-status.draft {
+            background: rgba(243, 156, 18, 0.1);
+            color: var(--warning-color);
+        }
+
+        .store-meta {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        /* Table styles */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            position: sticky;
+            top: 0;
+        }
+
+        .table tbody tr:hover {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        /* Form styles */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(181, 101, 29, 0.25);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        /* Action buttons container */
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* Badge styles */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border-radius: 0.25rem;
+            white-space: nowrap;
+        }
+
+        .badge-success {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success-color);
+        }
+
+        .badge-warning {
+            background: rgba(243, 156, 18, 0.1);
+            color: var(--warning-color);
+        }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-footer {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        /* Loading states */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .header-container {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .section-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .section-content {
+                padding: 1rem;
+            }
+
+            .stores-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Accessibility improvements */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Focus styles */
+        .btn:focus,
+        .form-control:focus,
+        .store-card:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        /* Print styles */
+        @media print {
+            .header,
+            .btn,
+            .actions {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container">
+            <h1>🛍️ HIVE POS Administration Console</h1>
+            <div class="user-info">
+                <span class="username">Welcome, <span id="usernameDisplay"></span></span>
+                <button class="btn btn-danger btn-sm" id="logoutBtn">
+                    🚪 Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Stores Section -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">Current Stores You Own</h2>
+                <button class="btn btn-primary" id="createStoreBtn">
+                    ➕ Create New Store
+                </button>
+            </div>
+            <div class="section-content">
+                <div class="stores-grid" id="storesGrid">
+                    <!-- Stores will be loaded here -->
+                </div>
+                <div class="empty-state" id="emptyStoresState" style="display: none;">
+                    <h3>No Stores Yet</h3>
+                    <p>Create your first store to get started with HIVE POS</p>
+                    <button class="btn btn-primary" onclick="createNewStore()">
+                        ➕ Create Your First Store
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cashiers Section -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">Active Cashiers</h2>
+                <button class="btn btn-success" id="addCashierBtn">
+                    👤 Add Cashier
+                </button>
+            </div>
+            <div class="section-content">
+                <div class="table-container">
+                    <table class="table" id="cashiersTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Name</th>
+                                <th>Store Access</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cashiersTableBody">
+                            <!-- Cashiers will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="emptyCashiersState" style="display: none;">
+                    <h3>No Cashiers Added</h3>
+                    <p>Add cashiers to allow them to operate your stores</p>
+                    <button class="btn btn-success" onclick="openAddCashierModal()">
+                        👤 Add Your First Cashier
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Add/Edit Cashier Modal -->
+    <div class="modal" id="cashierModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="cashierModalTitle">Add New Cashier</h3>
+                <button class="modal-close" onclick="closeCashierModal()">×</button>
+            </div>
+            <form id="cashierForm">
+                <input type="hidden" id="cashierId">
+                <div class="form-group">
+                    <label class="form-label" for="cashierUsername">Username</label>
+                    <input type="text" class="form-control" id="cashierUsername" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cashierName">Full Name</label>
+                    <input type="text" class="form-control" id="cashierName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cashierPassword">Password</label>
+                    <input type="password" class="form-control" id="cashierPassword" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Store Access</label>
+                    <div id="storeAccessList">
+                        <!-- Store checkboxes will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeCashierModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="saveCashierBtn">
+                        <span class="spinner" style="display: none;"></span>
+                        Save Cashier
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'https://hive-pos-backend.onrender.com/api';
+
+        // Authentication helpers
+        function getAuthToken() {
+            return localStorage.getItem('pos_admin_token');
+        }
+
+        function getAuthHeaders() {
+            const token = getAuthToken();
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // Check authentication
+        function checkAuth() {
+            const token = getAuthToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return false;
+            }
+            return true;
+        }
+
+        // Get user info
+        function getUserInfo() {
+            const userInfo = localStorage.getItem('pos_admin_user');
+            return userInfo ? JSON.parse(userInfo) : null;
+        }
+
+        // Logout function
+        function logout() {
+            localStorage.removeItem('pos_admin_token');
+            localStorage.removeItem('pos_admin_user');
+            localStorage.removeItem('pos_store_published');
+            window.location.href = 'login.html';
+        }
+
+        // Global state
+        let stores = [];
+        let cashiers = [];
+
+        // API Functions
+        async function loadStores() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/stores`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    stores = Array.isArray(data) ? data : [];
+                    renderStores();
+                } else if (response.status === 404) {
+                    stores = [];
+                    renderStores();
+                } else {
+                    throw new Error(`Failed to load stores: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+                showToast('Failed to load stores', 'error');
+            }
+        }
+
+        async function loadCashiers() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/cashiers`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    cashiers = Array.isArray(data) ? data : [];
+                    renderCashiers();
+                } else if (response.status === 404) {
+                    cashiers = [];
+                    renderCashiers();
+                } else {
+                    throw new Error(`Failed to load cashiers: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Error loading cashiers:', error);
+                showToast('Failed to load cashiers', 'error');
+            }
+        }
+
+        // Render functions
+        function renderStores() {
+            const grid = document.getElementById('storesGrid');
+            const emptyState = document.getElementById('emptyStoresState');
+
+            if (stores.length === 0) {
+                grid.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            emptyState.style.display = 'none';
+
+            const storeCards = stores.map(store => `
+                <div class="store-card" onclick="openStore('${store.id}')" tabindex="0" role="button">
+                    <div class="store-name">${escapeHtml(store.settings?.businessName || 'Unnamed Store')}</div>
+                    <div class="store-status ${store.published ? 'published' : 'draft'}">
+                        ${store.published ? 'Published' : 'Draft'}
+                    </div>
+                    <div class="store-meta">
+                        <div>Items: ${store.items?.length || 0}</div>
+                        <div>Last updated: ${formatDate(store.updatedAt || store.createdAt)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            const newStoreCard = `
+                <div class="store-card new-store" onclick="createNewStore()" tabindex="0" role="button">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">➕</div>
+                    <div style="font-weight: 600;">Create New Store</div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        Add another store to your portfolio
+                    </div>
+                </div>
+            `;
+
+            grid.innerHTML = storeCards + newStoreCard;
+        }
+
+        function renderCashiers() {
+            const tableBody = document.getElementById('cashiersTableBody');
+            const emptyState = document.getElementById('emptyCashiersState');
+
+            if (cashiers.length === 0) {
+                tableBody.closest('.table-container').style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            tableBody.closest('.table-container').style.display = 'block';
+            emptyState.style.display = 'none';
+
+            tableBody.innerHTML = cashiers.map(cashier => `
+                <tr>
+                    <td>${escapeHtml(cashier.username)}</td>
+                    <td>${escapeHtml(cashier.name)}</td>
+                    <td>
+                        ${(cashier.storeAccess || []).map(storeId => {
+                            const store = stores.find(s => s.id === storeId);
+                            return `<span class="badge badge-success">${escapeHtml(store?.settings?.businessName || 'Unknown Store')}</span>`;
+                        }).join(' ')}
+                    </td>
+                    <td>
+                        <span class="badge ${cashier.active ? 'badge-success' : 'badge-warning'}">
+                            ${cashier.active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn btn-primary btn-sm" onclick="editCashier('${cashier.id}')">
+                                ✏️ Edit
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="resetCashierPassword('${cashier.id}')">
+                                🔑 Reset Password
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteCashier('${cashier.id}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderStoreAccessList() {
+            const container = document.getElementById('storeAccessList');
+            
+            if (stores.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">No stores available. Create a store first.</p>';
+                return;
+            }
+
+            container.innerHTML = stores.map(store => `
+                <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <input type="checkbox" name="storeAccess" value="${store.id}">
+                    ${escapeHtml(store.settings?.businessName || 'Unnamed Store')}
+                </label>
+            `).join('');
+        }
+
+        // Store functions
+        function openStore(storeId) {
+            // Navigate to admin.html with store ID parameter
+            window.location.href = `admin.html?storeId=${storeId}`;
+        }
+
+        function createNewStore() {
+            // Navigate to admin.html for creating a new store
+            window.location.href = 'admin.html';
+        }
+
+        // Cashier functions
+        function openAddCashierModal() {
+            document.getElementById('cashierModalTitle').textContent = 'Add New Cashier';
+            document.getElementById('cashierForm').reset();
+            document.getElementById('cashierId').value = '';
+            renderStoreAccessList();
+            document.getElementById('cashierModal').classList.add('show');
+        }
+
+        function closeCashierModal() {
+            document.getElementById('cashierModal').classList.remove('show');
+        }
+
+        function editCashier(cashierId) {
+            const cashier = cashiers.find(c => c.id === cashierId);
+            if (!cashier) return;
+
+            document.getElementById('cashierModalTitle').textContent = 'Edit Cashier';
+            document.getElementById('cashierId').value = cashier.id;
+            document.getElementById('cashierUsername').value = cashier.username;
+            document.getElementById('cashierName').value = cashier.name;
+            document.getElementById('cashierPassword').value = '';
+            document.getElementById('cashierPassword').placeholder = 'Leave blank to keep current password';
+            
+            renderStoreAccessList();
+            
+            // Check the appropriate store access checkboxes
+            const checkboxes = document.querySelectorAll('input[name="storeAccess"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = (cashier.storeAccess || []).includes(checkbox.value);
+            });
+
+            document.getElementById('cashierModal').classList.add('show');
+        }
+
+        async function saveCashier(event) {
+            event.preventDefault();
+            
+            const saveBtn = document.getElementById('saveCashierBtn');
+            const spinner = saveBtn.querySelector('.spinner');
+            
+            try {
+                saveBtn.disabled = true;
+                spinner.style.display = 'inline-block';
+
+                const cashierId = document.getElementById('cashierId').value;
+                const username = document.getElementById('cashierUsername').value.trim();
+                const name = document.getElementById('cashierName').value.trim();
+                const password = document.getElementById('cashierPassword').value;
+                
+                const checkedBoxes = document.querySelectorAll('input[name="storeAccess"]:checked');
+                const storeAccess = Array.from(checkedBoxes).map(cb => cb.value);
+
+                const cashierData = {
+                    username,
+                    name,
+                    storeAccess,
+                    active: true
+                };
+
+                if (password) {
+                    cashierData.password = password;
+                }
+
+                const url = cashierId ? `${API_BASE_URL}/cashiers/${cashierId}` : `${API_BASE_URL}/cashiers`;
+                const method = cashierId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(cashierData)
+                });
+
+                if (response.ok) {
+                    showToast(`Cashier ${cashierId ? 'updated' : 'created'} successfully`, 'success');
+                    closeCashierModal();
+                    await loadCashiers();
+                } else {
+                    const error = await response.text();
+                    throw new Error(error || 'Failed to save cashier');
+                }
+            } catch (error) {
+                console.error('Error saving cashier:', error);
+                showToast(error.message || 'Failed to save cashier', 'error');
+            } finally {
+                saveBtn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function resetCashierPassword(cashierId) {
+            const newPassword = prompt('Enter new password for cashier:');
+            if (!newPassword) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/cashiers/${cashierId}/password`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ password: newPassword })
+                });
+
+                if (response.ok) {
+                    showToast('Password reset successfully', 'success');
+                } else {
+                    throw new Error('Failed to reset password');
+                }
+            } catch (error) {
+                console.error('Error resetting password:', error);
+                showToast('Failed to reset password', 'error');
+            }
+        }
+
+        async function deleteCashier(cashierId) {
+            const cashier = cashiers.find(c => c.id === cashierId);
+            if (!cashier) return;
+
+            if (!confirm(`Are you sure you want to delete cashier "${cashier.name}"?`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/cashiers/${cashierId}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+
+                if (response.ok) {
+                    showToast('Cashier deleted successfully', 'success');
+                    await loadCashiers();
+                } else {
+                    throw new Error('Failed to delete cashier');
+                }
+            } catch (error) {
+                console.error('Error deleting cashier:', error);
+                showToast('Failed to delete cashier', 'error');
+            }
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function showToast(message, type = 'info') {
+            // Simple toast implementation
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                background: ${type === 'success' ? 'var(--success-color)' : type === 'error' ? 'var(--danger-color)' : 'var(--info-color)'};
+                color: white;
+                border-radius: var(--border-radius);
+                box-shadow: var(--shadow);
+                z-index: 1001;
+                transition: var(--transition);
+                transform: translateX(100%);
+            `;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+
+        // Event listeners
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+        document.getElementById('createStoreBtn').addEventListener('click', createNewStore);
+        document.getElementById('addCashierBtn').addEventListener('click', openAddCashierModal);
+        document.getElementById('cashierForm').addEventListener('submit', saveCashier);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeCashierModal();
+            }
+        });
+
+        // Initialize the dashboard
+        async function initializeDashboard() {
+            // Check authentication
+            if (!checkAuth()) return;
+
+            // Display username
+            const userInfo = getUserInfo();
+            if (userInfo && userInfo.username) {
+                document.getElementById('usernameDisplay').textContent = userInfo.username;
+            }
+
+            // Load data
+            try {
+                await Promise.all([
+                    loadStores(),
+                    loadCashiers()
+                ]);
+            } catch (error) {
+                console.error('Failed to initialize dashboard:', error);
+                showToast('Failed to load dashboard data', 'error');
+            }
+        }
+
+        // Start the application
+        initializeDashboard();
+    </script>
+</body>
+</html>
