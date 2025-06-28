@@ -6,7 +6,23 @@
     <title>Point of Sale Admin</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 2rem; background: #f8f8f8; }
-        h1 { color: #b5651d; }
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        h1 { color: #b5651d; margin: 0; }
+        .logout-btn { 
+            background: #e74c3c; 
+            color: #fff; 
+            border: none; 
+            padding: 0.75rem 1.5rem; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        .logout-btn:hover { 
+            background: #c0392b; 
+            transform: translateY(-1px);
+        }
         form { margin-bottom: 2rem; background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 8px #eee; }
         label { display: block; margin-top: 1rem; }
         input[type="text"], input[type="number"], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
@@ -16,10 +32,26 @@
         .item-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; }
         .item-actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; }
         .item-actions button { flex: 1; font-size: 0.9em; }
+        
+        @media (max-width: 768px) {
+            .header-container { 
+                flex-direction: column; 
+                gap: 1rem; 
+                align-items: flex-start; 
+            }
+            .logout-btn {
+                align-self: flex-end;
+                padding: 0.5rem 1rem;
+                font-size: 0.8rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Point of Sale Admin</h1>
+    <div class="header-container">
+        <h1>Point of Sale Admin</h1>
+        <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+    </div>
     <form id="itemForm" enctype="multipart/form-data">
         <input type="hidden" id="itemId">
         <label>Item Name:
@@ -138,6 +170,20 @@
                 return false;
             }
             return true;
+        }
+
+        // Logout function
+        function logout() {
+            // Clear authentication data
+            localStorage.removeItem('pos_admin_token');
+            localStorage.removeItem('pos_admin_user');
+            
+            // Optional: Clear cached data (uncomment if you want to clear cache on logout)
+            // localStorage.removeItem('pos_items');
+            // localStorage.removeItem('pos_settings');
+            
+            // Redirect to login page
+            window.location.href = 'login.html';
         }
 
         // API Functions
@@ -307,6 +353,11 @@
             document.getElementById('saveBtn').textContent = 'Add Item';
             this.style.display = 'none';
         };
+
+        // Logout button
+        document.getElementById('logoutBtn').onclick = function() {
+            logout();
+        };
         // Delete item
         window.deleteItem = async function(id) {
             if (!confirm('Delete this item?')) return;
@@ -413,7 +464,6 @@
             const settings = await getStoreSettings();
             settings.hiveAccount = this.value;
             await saveStoreSettings(settings);
-        });
         });
 
         // Add button logic for category add
