@@ -1155,7 +1155,7 @@
         function editStore() {
             if (userStore) {
                 // Navigate to admin.html with store ID parameter if available
-                const storeId = userStore.id || userStore.storeId;
+                const storeId = userStore._id || userStore.id || userStore.storeId;
                 if (storeId) {
                     window.location.href = `admin.html?storeId=${storeId}`;
                 } else {
