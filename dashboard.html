@@ -1061,10 +1061,10 @@
             const storeStatus = userStore.published ? 'Published' : 'Draft';
             const statusClass = userStore.published ? 'published' : 'draft';
 
-            // Get banner image from store config
-            const bannerImage = userStore.settings?.bannerImage || userStore.bannerImage || null;
-            const bannerStyle = bannerImage ? 
-                `background-image: url('${bannerImage}');` : 
+            // Get banner image from store config - check for bannerUrl
+            const bannerUrl = userStore.settings?.bannerUrl || userStore.bannerUrl || null;
+            const bannerStyle = bannerUrl ? 
+                `background-image: url('${bannerUrl}');` : 
                 `background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));`;
 
             // Metrics - can now pull from config or store data
