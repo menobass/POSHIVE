@@ -653,6 +653,9 @@
                 if (response.ok) {
                     showSuccess('Account created successfully! You can now log in.');
                     
+                    // Mark this as a new user for the onboarding flow
+                    localStorage.setItem('pos_new_user_flag', 'true');
+                    
                     // Reset form and switch to login
                     registerForm.reset();
                     setTimeout(() => {
