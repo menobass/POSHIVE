@@ -865,28 +865,28 @@
         let userStore = null;
         let cashiers = [];
 
-        // API Functions - Load user's single store
+        // API Functions - Load user's store config
         async function loadUserStore() {
             try {
-                const response = await fetch(`${API_BASE_URL}/stores`, {
+                const response = await fetch(`${API_BASE_URL}/config`, {
                     method: 'GET',
                     headers: getAuthHeaders()
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    // Take the first store (single store model)
-                    userStore = Array.isArray(data) && data.length > 0 ? data[0] : null;
+                    // Use the config data as the store
+                    userStore = data || null;
                     renderStore();
                 } else if (response.status === 404) {
                     userStore = null;
                     renderStore();
                 } else {
-                    throw new Error(`Failed to load store: ${response.status}`);
+                    throw new Error(`Failed to load store config: ${response.status}`);
                 }
             } catch (error) {
-                console.error('Error loading store:', error);
-                showToast('Failed to load store', 'error');
+                console.error('Error loading store config:', error);
+                showToast('Failed to load store config', 'error');
             }
         }
 
@@ -930,15 +930,15 @@
             noStoreState.style.display = 'none';
             editStoreBtn.style.display = 'inline-flex';
 
-            const storeName = userStore.settings?.businessName || userStore.name || 'Unnamed Store';
+            const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
             const storeStatus = userStore.published ? 'Published' : 'Draft';
             const statusClass = userStore.published ? 'published' : 'draft';
 
-            // Dummy metrics for now
-            const itemsCount = userStore.items?.length || 0;
+            // Metrics - can now pull from config or store data
+            const itemsCount = userStore.items?.length || userStore.itemCount || 0;
             const cashiersCount = cashiers.length || 0;
-            const totalSales = 0; // Dummy
-            const todayOrders = 0; // Dummy
+            const totalSales = userStore.totalSales || 0; // Can be pulled from config
+            const todayOrders = userStore.todayOrders || 0; // Can be pulled from config
 
             storeDisplay.innerHTML = `
                 <div class="store-display">
@@ -992,8 +992,9 @@
                     <td>
                         ${(cashier.storeAccess || []).map(storeId => {
                             // Check if the store ID matches the user's store
-                            if (userStore && storeId === userStore.id) {
-                                const storeName = userStore.settings?.businessName || userStore.name || 'Unnamed Store';
+                            const userStoreId = userStore?.id || userStore?.storeId || 'default';
+                            if (userStore && storeId === userStoreId) {
+                                const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
                                 return `<span class="badge badge-success">${escapeHtml(storeName)}</span>`;
                             }
                             return `<span class="badge badge-warning">Unknown Store</span>`;
@@ -1029,10 +1030,12 @@
                 return;
             }
 
-            const storeName = userStore.settings?.businessName || userStore.name || 'Unnamed Store';
+            const storeName = userStore.settings?.businessName || userStore.businessName || userStore.name || 'Unnamed Store';
+            const storeId = userStore.id || userStore.storeId || 'default';
+            
             container.innerHTML = `
                 <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    <input type="checkbox" name="storeAccess" value="${userStore.id}" checked>
+                    <input type="checkbox" name="storeAccess" value="${storeId}" checked>
                     ${escapeHtml(storeName)}
                 </label>
             `;
@@ -1041,8 +1044,14 @@
         // Store functions
         function editStore() {
             if (userStore) {
-                // Navigate to admin.html with store ID parameter
-                window.location.href = `admin.html?storeId=${userStore.id}`;
+                // Navigate to admin.html with store ID parameter if available
+                const storeId = userStore.id || userStore.storeId;
+                if (storeId) {
+                    window.location.href = `admin.html?storeId=${storeId}`;
+                } else {
+                    // If no ID, just go to admin for editing config
+                    window.location.href = 'admin.html';
+                }
             }
         }
 
