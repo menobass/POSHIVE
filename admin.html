@@ -475,7 +475,8 @@
         async function loadConfigFromAPI(storeId = null) {
             try {
                 console.log('Loading config from API...');
-                const url = storeId ? `${API_BASE_URL}/stores/${storeId}` : `${API_BASE_URL}/config`;
+                // Always use /api/config endpoint since we have single-store model
+                const url = `${API_BASE_URL}/config`;
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: getAuthHeaders()
@@ -506,8 +507,9 @@
         async function saveConfigToAPI(config, storeId = null) {
             try {
                 console.log('Saving config to API:', config);
-                const url = storeId ? `${API_BASE_URL}/stores/${storeId}` : `${API_BASE_URL}/stores`;
-                const method = storeId ? 'PUT' : 'POST';
+                // Always use /api/config endpoint since we have single-store model
+                const url = `${API_BASE_URL}/config`;
+                const method = 'PUT'; // Always PUT for updating config
                 
                 const response = await fetch(url, {
                     method,
@@ -530,7 +532,6 @@
 
         // Global state for tracking changes
         let isDirty = false;
-        let currentStoreId = getStoreIdFromUrl(); // Track which store we're editing
         let currentData = {
             items: [],
             settings: {
@@ -1005,48 +1006,39 @@
             // Check authentication first
             if (!checkAuth()) return;
 
-            // Update page title based on whether we're editing a specific store
-            const pageTitle = document.getElementById('pageTitle');
-            if (currentStoreId) {
-                pageTitle.textContent = 'Edit Store';
-            } else {
-                pageTitle.textContent = 'Create New Store';
-            }
-
             try {
-                if (currentStoreId) {
-                    // Editing existing store - load from API
-                    console.log('Loading existing store:', currentStoreId);
+                // Always try to load from API first (single-store model)
+                console.log('Loading store configuration from API...');
+                
+                const apiConfig = await loadConfigFromAPI();
+                
+                if (apiConfig) {
+                    console.log('Store config loaded from API');
+                    // Load data into memory
+                    currentData.items = apiConfig.items || [];
+                    currentData.settings = apiConfig.settings || {
+                        businessName: '',
+                        bannerUrl: '',
+                        categories: ['drink', 'pastry', 'bread', 'other'],
+                        hiveAccount: '',
+                        bitcoinLightningEnabled: false,
+                        bitcoinLightningConfig: undefined
+                    };
+                    markClean(); // Data is fresh from API
                     
-                    const apiConfig = await loadConfigFromAPI(currentStoreId);
-                    
-                    if (apiConfig) {
-                        console.log('Store config loaded from API');
-                        // Load data into memory
-                        currentData.items = apiConfig.items || [];
-                        currentData.settings = apiConfig.settings || {
-                            businessName: '',
-                            bannerUrl: '',
-                            categories: ['drink', 'pastry', 'bread', 'other'],
-                            hiveAccount: '',
-                            bitcoinLightningEnabled: false,
-                            bitcoinLightningConfig: undefined
-                        };
-                        markClean(); // Data is fresh from API
-                        
-                        // Update page title with store name
-                        if (currentData.settings.businessName) {
-                            pageTitle.textContent = `Edit Store: ${currentData.settings.businessName}`;
-                        }
+                    // Update page title with store name
+                    const pageTitle = document.getElementById('pageTitle');
+                    if (currentData.settings.businessName) {
+                        pageTitle.textContent = `Edit Store: ${currentData.settings.businessName}`;
                     } else {
-                        console.log('Store not found, redirecting to dashboard');
-                        alert('Store not found. Redirecting to dashboard.');
-                        goToDashboard();
-                        return;
+                        pageTitle.textContent = 'Edit Store';
                     }
                 } else {
-                    // Creating new store
-                    console.log('Creating new store');
+                    // No published store exists, creating new store
+                    console.log('No published store found, creating new store');
+                    
+                    const pageTitle = document.getElementById('pageTitle');
+                    pageTitle.textContent = 'Create New Store';
                     
                     // Check if this is a new user
                     if (isNewUser()) {
@@ -1246,19 +1238,10 @@
                     published: true
                 };
 
-                // Save to API
-                const result = await saveConfigToAPI(config, currentStoreId);
+                // Save to API (single-store model, no store ID needed)
+                const result = await saveConfigToAPI(config);
                 
                 if (result) {
-                    // If this was a new store, update the current store ID
-                    if (!currentStoreId && result.id) {
-                        currentStoreId = result.id;
-                        // Update URL to include store ID
-                        const newUrl = new URL(window.location);
-                        newUrl.searchParams.set('storeId', currentStoreId);
-                        window.history.replaceState({}, '', newUrl);
-                    }
-                    
                     // Mark as published
                     localStorage.setItem('pos_store_published', 'true');
                     
