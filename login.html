@@ -234,6 +234,134 @@
             line-height: 1.4;
         }
 
+        /* Debug Features */
+        .debug-section {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .debug-header h3 {
+            margin: 0;
+            color: #6c757d;
+            font-size: 1rem;
+        }
+
+        .service-status-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+
+        .service-status-btn:hover {
+            background: #138496;
+        }
+
+        .service-status-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+
+        .status-dot.online {
+            background: #28a745;
+        }
+
+        .status-dot.offline {
+            background: #dc3545;
+        }
+
+        .debug-console {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
+
+        .debug-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #4a5568;
+        }
+
+        .debug-entry:last-child {
+            border-bottom: none;
+        }
+
+        .debug-timestamp {
+            color: #cbd5e0;
+            font-size: 0.7rem;
+        }
+
+        .debug-method {
+            color: #68d391;
+            font-weight: bold;
+        }
+
+        .debug-url {
+            color: #90cdf4;
+        }
+
+        .debug-status {
+            font-weight: bold;
+        }
+
+        .debug-status.success {
+            color: #68d391;
+        }
+
+        .debug-status.error {
+            color: #f56565;
+        }
+
+        .debug-clear {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 1rem;
+        }
+
+        .debug-clear:hover {
+            background: #c53030;
+        }
+
         @media (max-width: 480px) {
             .login-container {
                 margin: 10px;
@@ -245,6 +373,16 @@
             
             .login-header {
                 padding: 1.5rem 1rem 1rem;
+            }
+
+            .debug-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+            }
+
+            .debug-console {
+                font-size: 0.7rem;
             }
         }
     </style>
@@ -323,6 +461,26 @@
                 
                 <button type="submit" class="submit-btn" id="registerBtn">Create Account</button>
             </form>
+
+            <!-- Debug Section -->
+            <div class="debug-section">
+                <div class="debug-header">
+                    <h3>🔧 Debug Tools</h3>
+                    <div>
+                        <button class="service-status-btn" id="checkServiceBtn">Check Service Status</button>
+                        <span class="status-indicator" id="serviceStatus">
+                            <span class="status-dot" id="statusDot"></span>
+                            <span id="statusText">Unknown</span>
+                        </span>
+                        <button class="debug-clear" id="clearDebugBtn">Clear</button>
+                    </div>
+                </div>
+                <div class="debug-console" id="debugConsole">
+                    <div class="debug-entry">
+                        <span class="debug-timestamp">Debug console initialized...</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -338,6 +496,14 @@
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
         const loadingMessage = document.getElementById('loadingMessage');
+
+        // Debug Elements
+        const checkServiceBtn = document.getElementById('checkServiceBtn');
+        const serviceStatus = document.getElementById('serviceStatus');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const debugConsole = document.getElementById('debugConsole');
+        const clearDebugBtn = document.getElementById('clearDebugBtn');
 
         // Toggle between login and register forms
         loginToggle.addEventListener('click', () => {
@@ -411,15 +577,13 @@
             setLoading(true);
             
             try {
-                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                const { response, data } = await debugFetch(`${API_BASE_URL}/auth/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ username, password })
                 });
-                
-                const data = await response.json();
                 
                 if (response.ok) {
                     // Store the token
@@ -478,15 +642,13 @@
             setLoading(true);
             
             try {
-                const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                const { response, data } = await debugFetch(`${API_BASE_URL}/auth/register`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ username, email, password })
                 });
-                
-                const data = await response.json();
                 
                 if (response.ok) {
                     showSuccess('Account created successfully! You can now log in.');
@@ -558,6 +720,10 @@
             alert('Password reset functionality will be implemented soon. Please contact your administrator.');
         });
 
+        // Debug event listeners
+        checkServiceBtn.addEventListener('click', checkServiceStatus);
+        clearDebugBtn.addEventListener('click', clearDebugConsole);
+
         // Check auth status on page load
         checkAuthStatus();
 
@@ -570,6 +736,170 @@
                 }
             }
         });
+
+        // Service status check (debug feature)
+        checkServiceBtn.addEventListener('click', async () => {
+            setLoading(true);
+            statusText.textContent = 'Checking...';
+            statusDot.classList.remove('online', 'offline');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/status`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusText.textContent = 'Online';
+                    statusDot.classList.add('online');
+                    logDebug('Service status checked: Online', 'success');
+                } else {
+                    statusText.textContent = 'Offline';
+                    statusDot.classList.add('offline');
+                    logDebug('Service status checked: Offline', 'error');
+                }
+            } catch (error) {
+                statusText.textContent = 'Error';
+                statusDot.classList.add('offline');
+                logDebug('Service status check error', 'error');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Debug console logging
+        function logDebug(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.classList.add('debug-entry');
+            
+            const timestamp = new Date().toISOString();
+            const formattedMessage = `[${timestamp}] ${message}`;
+            
+            entry.innerHTML = `<span class="debug-timestamp">${formattedMessage}</span>`;
+            
+            if (type === 'error') {
+                entry.innerHTML += ` <span class="debug-status error">ERROR</span>`;
+            } else if (type === 'success') {
+                entry.innerHTML += ` <span class="debug-status success">SUCCESS</span>`;
+            }
+            
+            debugConsole.appendChild(entry);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+        }
+
+        // Clear debug console
+        clearDebugBtn.addEventListener('click', () => {
+            debugConsole.innerHTML = '';
+            logDebug('Debug console cleared');
+        });
+
+        // Debug Functions
+        function debugLog(method, url, status, response, error = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'debug-entry';
+            
+            const statusClass = status >= 200 && status < 300 ? 'success' : 'error';
+            const statusText = error ? 'ERROR' : status;
+            
+            entry.innerHTML = `
+                <div class="debug-timestamp">[${timestamp}]</div>
+                <div><span class="debug-method">${method}</span> <span class="debug-url">${url}</span></div>
+                <div>Status: <span class="debug-status ${statusClass}">${statusText}</span></div>
+                ${error ? `<div>Error: ${error}</div>` : ''}
+                <div>Response: ${JSON.stringify(response, null, 2)}</div>
+            `;
+            
+            debugConsole.appendChild(entry);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+        }
+
+        function clearDebugConsole() {
+            debugConsole.innerHTML = '<div class="debug-entry"><span class="debug-timestamp">Debug console cleared...</span></div>';
+        }
+
+        function updateServiceStatus(isOnline, message) {
+            if (isOnline) {
+                statusDot.className = 'status-dot online';
+                statusText.textContent = 'Online';
+            } else {
+                statusDot.className = 'status-dot offline';
+                statusText.textContent = message || 'Offline';
+            }
+        }
+
+        // Service Status Check
+        async function checkServiceStatus() {
+            checkServiceBtn.disabled = true;
+            checkServiceBtn.textContent = 'Checking...';
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = { message: 'Non-JSON response received' };
+                }
+                
+                debugLog('GET', `${API_BASE_URL}/health`, response.status, {
+                    ...data,
+                    responseTime: `${responseTime}ms`,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
+                if (response.ok) {
+                    updateServiceStatus(true, `Online (${responseTime}ms)`);
+                } else {
+                    updateServiceStatus(false, `HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                debugLog('GET', `${API_BASE_URL}/health`, 0, {}, error.message);
+                updateServiceStatus(false, 'Connection Failed');
+            } finally {
+                checkServiceBtn.disabled = false;
+                checkServiceBtn.textContent = 'Check Service Status';
+            }
+        }
+
+        // Enhanced API call wrapper for debugging
+        async function debugFetch(url, options = {}) {
+            const method = options.method || 'GET';
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch(url, options);
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = await response.text();
+                }
+                
+                debugLog(method, url, response.status, {
+                    data,
+                    responseTime: `${responseTime}ms`,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
+                return { response, data };
+            } catch (error) {
+                debugLog(method, url, 0, {}, error.message);
+                throw error;
+            }
+        }
     </script>
 </body>
 </html>
