@@ -870,7 +870,7 @@
 
             const storeCards = stores.map(store => `
                 <div class="store-card" onclick="openStore('${store.id}')" tabindex="0" role="button">
-                    <div class="store-name">${escapeHtml(store.settings?.businessName || 'Unnamed Store')}</div>
+                    <div class="store-name">${escapeHtml(store.settings?.businessName || store.name || 'Unnamed Store')}</div>
                     <div class="store-status ${store.published ? 'published' : 'draft'}">
                         ${store.published ? 'Published' : 'Draft'}
                     </div>
@@ -914,7 +914,7 @@
                     <td>
                         ${(cashier.storeAccess || []).map(storeId => {
                             const store = stores.find(s => s.id === storeId);
-                            return `<span class="badge badge-success">${escapeHtml(store?.settings?.businessName || 'Unknown Store')}</span>`;
+                            return `<span class="badge badge-success">${escapeHtml(store?.settings?.businessName || store?.name || 'Unknown Store')}</span>`;
                         }).join(' ')}
                     </td>
                     <td>
@@ -950,7 +950,7 @@
             container.innerHTML = stores.map(store => `
                 <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <input type="checkbox" name="storeAccess" value="${store.id}">
-                    ${escapeHtml(store.settings?.businessName || 'Unnamed Store')}
+                    ${escapeHtml(store.settings?.businessName || store.name || 'Unnamed Store')}
                 </label>
             `).join('');
         }
