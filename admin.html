@@ -23,6 +23,32 @@
             background: #c0392b; 
             transform: translateY(-1px);
         }
+        .save-draft-btn {
+            background: #f39c12;
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
+        }
+        .save-draft-btn:hover:not(:disabled) {
+            background: #e67e22;
+            transform: translateY(-1px);
+        }
+        .save-draft-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
         form { margin-bottom: 2rem; background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 8px #eee; }
         label { display: block; margin-top: 1rem; }
         input[type="text"], input[type="number"], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
@@ -39,10 +65,17 @@
                 gap: 1rem; 
                 align-items: flex-start; 
             }
-            .logout-btn {
+            .header-buttons {
                 align-self: flex-end;
+                flex-direction: column;
+                gap: 0.5rem;
+                width: 100%;
+                max-width: 200px;
+            }
+            .logout-btn, .save-draft-btn {
                 padding: 0.5rem 1rem;
                 font-size: 0.8rem;
+                width: 100%;
             }
         }
     </style>
@@ -50,7 +83,10 @@
 <body>
     <div class="header-container">
         <h1>Point of Sale Admin</h1>
-        <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+        <div class="header-buttons">
+            <button class="save-draft-btn" id="saveDraftBtn" disabled>💾 Save Draft</button>
+            <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+        </div>
     </div>
     <form id="itemForm" enctype="multipart/form-data">
         <input type="hidden" id="itemId">
@@ -112,10 +148,10 @@
         <!-- Publish Store Section -->
         <div id="publishSection" style="margin-top:2rem;padding-top:1.5rem;border-top:2px solid #f0f0f0;">
             <div id="draftStatus" style="background:#fff3cd;color:#856404;padding:1rem;border-radius:6px;margin-bottom:1rem;border:1px solid #ffeaa7;">
-                <strong>📝 Draft Mode:</strong> Your changes are being saved automatically as drafts. Click "Publish Store" when you're ready to make your store live!
+                <strong>📝 Draft Mode:</strong> Your changes are kept in memory. Use "Save Draft" to save your progress, then "Publish Store" to make it live!
             </div>
             <div id="publishedStatus" style="background:#d4edda;color:#155724;padding:1rem;border-radius:6px;margin-bottom:1rem;border:1px solid #c3e6cb;display:none;">
-                <strong>✅ Store Published:</strong> Your store is live! All changes are automatically saved to the cloud.
+                <strong>✅ Store Published:</strong> Your store is live! Changes are kept in memory until you save or publish.
             </div>
             <button type="button" id="publishStoreBtn" style="background:#28a745;color:#fff;padding:1rem 2rem;font-size:1.1rem;font-weight:600;border:none;border-radius:6px;cursor:pointer;transition:background 0.3s ease;">
                 🚀 Publish Store
@@ -215,14 +251,6 @@
                     // Mark as published since data exists on server
                     localStorage.setItem('pos_store_published', 'true');
                     
-                    // Save to localStorage as cache
-                    if (config.items) {
-                        localStorage.setItem('pos_items', JSON.stringify(config.items));
-                    }
-                    if (config.settings) {
-                        localStorage.setItem('pos_settings', JSON.stringify(config.settings));
-                    }
-                    
                     return config;
                 } else if (response.status === 404) {
                     // No config exists, user hasn't published yet
@@ -234,9 +262,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load config from API:', error);
-                // Fall back to localStorage
-                console.log('Falling back to localStorage');
-                return null;
+                throw error; // Don't fall back to localStorage anymore
             }
         }
 
@@ -262,70 +288,63 @@
             }
         }
 
-        // Enhanced data functions with API integration
-        // Enhanced data functions with draft support
-        async function getItems() {
-            // Check if we have published data first, then drafts, then default
-            let items = localStorage.getItem('pos_items');
-            if (!items) {
-                items = localStorage.getItem('pos_draft_items');
+        // Global state for tracking changes
+        let isDirty = false;
+        let currentData = {
+            items: [],
+            settings: {
+                businessName: '',
+                bannerUrl: '',
+                categories: ['drink', 'pastry', 'bread', 'other'],
+                hiveAccount: '',
+                bitcoinLightningEnabled: false,
+                bitcoinLightningConfig: undefined
             }
-            return JSON.parse(items || '[]');
+        };
+
+        // Mark data as dirty (changed)
+        function markDirty() {
+            if (!isDirty) {
+                isDirty = true;
+                updateSaveDraftButton();
+            }
+        }
+
+        // Mark data as clean (saved)
+        function markClean() {
+            isDirty = false;
+            updateSaveDraftButton();
+        }
+
+        // Update save draft button state
+        function updateSaveDraftButton() {
+            const saveDraftBtn = document.getElementById('saveDraftBtn');
+            if (isDirty) {
+                saveDraftBtn.disabled = false;
+                saveDraftBtn.textContent = '💾 Save Draft';
+            } else {
+                saveDraftBtn.disabled = true;
+                saveDraftBtn.textContent = '✅ Saved';
+            }
+        }
+
+        // Enhanced data functions - API first, no localStorage fallback
+        async function getItems() {
+            return [...currentData.items]; // Return copy to prevent mutations
         }
 
         async function saveItems(items) {
-            // For new users or unpublished stores, save as drafts
-            const hasPublishedStore = localStorage.getItem('pos_store_published') === 'true';
-            
-            if (hasPublishedStore) {
-                // Save to both localStorage and API for published stores
-                localStorage.setItem('pos_items', JSON.stringify(items));
-                
-                // Also save to API
-                const settings = await getStoreSettings();
-                const config = {
-                    items: items,
-                    settings: settings
-                };
-                
-                await saveConfigToAPI(config);
-            } else {
-                // Save as draft for unpublished stores
-                localStorage.setItem('pos_draft_items', JSON.stringify(items));
-                console.log('Items saved as draft');
-            }
+            currentData.items = [...items]; // Store copy
+            markDirty();
         }
 
         async function getStoreSettings() {
-            // Check if we have published data first, then drafts, then default
-            let settings = localStorage.getItem('pos_settings');
-            if (!settings) {
-                settings = localStorage.getItem('pos_draft_settings');
-            }
-            return JSON.parse(settings || '{"businessName":"","bannerUrl":"","categories":["drink","pastry","bread","other"],"hiveAccount":"","bitcoinLightningEnabled":false}');
+            return { ...currentData.settings }; // Return copy to prevent mutations
         }
 
         async function saveStoreSettings(settings) {
-            // For new users or unpublished stores, save as drafts
-            const hasPublishedStore = localStorage.getItem('pos_store_published') === 'true';
-            
-            if (hasPublishedStore) {
-                // Save to both localStorage and API for published stores
-                localStorage.setItem('pos_settings', JSON.stringify(settings));
-                
-                // Also save to API
-                const items = await getItems();
-                const config = {
-                    items: items,
-                    settings: settings
-                };
-                
-                await saveConfigToAPI(config);
-            } else {
-                // Save as draft for unpublished stores
-                localStorage.setItem('pos_draft_settings', JSON.stringify(settings));
-                console.log('Settings saved as draft');
-            }
+            currentData.settings = { ...settings }; // Store copy
+            markDirty();
         }
         // Utility: Generate unique ID
         function generateId() {
@@ -403,6 +422,47 @@
         // Logout button
         document.getElementById('logoutBtn').onclick = function() {
             logout();
+        };
+
+        // Save Draft functionality
+        async function saveDraftToAPI() {
+            const saveDraftBtn = document.getElementById('saveDraftBtn');
+            
+            try {
+                saveDraftBtn.disabled = true;
+                saveDraftBtn.textContent = '💾 Saving...';
+                
+                const config = {
+                    items: currentData.items,
+                    settings: currentData.settings
+                };
+
+                // Save to API as draft
+                const success = await saveConfigToAPI(config);
+                
+                if (success) {
+                    markClean();
+                    console.log('Draft saved successfully');
+                    
+                    // Show brief success feedback
+                    saveDraftBtn.textContent = '✅ Saved!';
+                    setTimeout(() => {
+                        updateSaveDraftButton();
+                    }, 2000);
+                } else {
+                    throw new Error('API save failed');
+                }
+            } catch (error) {
+                console.error('Failed to save draft:', error);
+                alert('Failed to save draft. Please check your connection and try again.');
+                saveDraftBtn.disabled = false;
+                saveDraftBtn.textContent = '💾 Save Draft';
+            }
+        }
+
+        // Save Draft button
+        document.getElementById('saveDraftBtn').onclick = function() {
+            saveDraftToAPI();
         };
         // Delete item
         window.deleteItem = async function(id) {
@@ -589,34 +649,38 @@
         // Clear new user flag and any cached data
         function clearNewUserState() {
             localStorage.removeItem('pos_new_user_flag');
+            // Clear ALL localStorage data to prevent leakage
+            localStorage.removeItem('pos_items');
+            localStorage.removeItem('pos_settings');
+            localStorage.removeItem('pos_draft_items');
+            localStorage.removeItem('pos_draft_settings');
+            localStorage.removeItem('pos_store_published');
         }
 
         // Initialize fresh store for new users
         function initializeFreshStore() {
             console.log('Initializing fresh store for new user');
             
-            // Clear any existing localStorage data that might be from demos/previous sessions
-            localStorage.removeItem('pos_items');
-            localStorage.removeItem('pos_settings');
-            localStorage.removeItem('pos_draft_items');
-            localStorage.removeItem('pos_draft_settings');
+            // Clear any existing localStorage data completely
+            clearNewUserState();
             
-            // Set default fresh store data
-            const defaultItems = [];
-            const defaultSettings = {
-                businessName: '',
-                bannerUrl: '',
-                categories: ['drink', 'pastry', 'bread', 'other'],
-                hiveAccount: '',
-                bitcoinLightningEnabled: false,
-                bitcoinLightningConfig: undefined
+            // Set clean default data in memory only
+            currentData = {
+                items: [],
+                settings: {
+                    businessName: '',
+                    bannerUrl: '',
+                    categories: ['drink', 'pastry', 'bread', 'other'],
+                    hiveAccount: '',
+                    bitcoinLightningEnabled: false,
+                    bitcoinLightningConfig: undefined
+                }
             };
             
-            // Save default data as drafts (not published yet)
-            localStorage.setItem('pos_draft_items', JSON.stringify(defaultItems));
-            localStorage.setItem('pos_draft_settings', JSON.stringify(defaultSettings));
+            // Start with clean state
+            markClean();
             
-            return { items: defaultItems, settings: defaultSettings };
+            return currentData;
         }
 
         // Show new user onboarding
@@ -650,13 +714,13 @@
             modal.innerHTML = `
                 <h2 style="color: #b5651d; margin-bottom: 1rem;">Welcome to HIVE POS! 🎉</h2>
                 <p style="margin-bottom: 1.5rem; line-height: 1.6; color: #666;">
-                    You're about to set up your new point-of-sale system. Your changes will be saved as drafts automatically, 
-                    and you can publish your store when you're ready.
+                    You're about to set up your new point-of-sale system. Your changes will be kept in memory as you work, 
+                    and you can save your progress using the "Save Draft" button.
                 </p>
                 <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                     <p style="margin: 0; font-size: 0.9rem; color: #666;">
                         💡 <strong>Tip:</strong> Start by setting your business name and adding your first items. 
-                        Everything saves automatically as you work!
+                        Use "Save Draft" to save your progress, then "Publish Store" when ready to go live!
                     </p>
                 </div>
                 <button id="startSetupBtn" style="
@@ -696,43 +760,36 @@
                 if (isNewUser()) {
                     console.log('New user detected, initializing fresh store');
                     
-                    // Initialize fresh store
+                    // Initialize fresh store (in memory only)
                     const freshData = initializeFreshStore();
                     
                     // Show onboarding
                     showNewUserOnboarding();
                     
-                    // Render fresh UI
-                    await renderStoreSettings();
-                    await renderCategoryOptions();
-                    await renderItems();
-                    await renderCurrentHiveAccount();
-                    await loadBitcoinLightningSettings();
-                    
-                    // Update publish status (should show draft mode)
-                    updatePublishStatus();
-                    
                     console.log('Fresh store initialized for new user');
-                    return;
-                }
-
-                // Existing user flow - try to load config from API
-                const apiConfig = await loadConfigFromAPI();
-                
-                if (apiConfig) {
-                    console.log('Loaded config from API for existing user');
-                    // Config was loaded from API, data is already in localStorage
                 } else {
-                    console.log('No API config found for existing user, checking drafts');
-                    // Check if user has drafts
-                    const hasDrafts = localStorage.getItem('pos_draft_items') || localStorage.getItem('pos_draft_settings');
-                    if (hasDrafts) {
-                        console.log('Loading draft data');
-                        // Move drafts to active localStorage
-                        const draftItems = localStorage.getItem('pos_draft_items');
-                        const draftSettings = localStorage.getItem('pos_draft_settings');
-                        if (draftItems) localStorage.setItem('pos_items', draftItems);
-                        if (draftSettings) localStorage.setItem('pos_settings', draftSettings);
+                    // Existing user - try to load from API only
+                    console.log('Existing user, loading from API...');
+                    
+                    const apiConfig = await loadConfigFromAPI();
+                    
+                    if (apiConfig) {
+                        console.log('Config loaded from API');
+                        // Load data into memory
+                        currentData.items = apiConfig.items || [];
+                        currentData.settings = apiConfig.settings || {
+                            businessName: '',
+                            bannerUrl: '',
+                            categories: ['drink', 'pastry', 'bread', 'other'],
+                            hiveAccount: '',
+                            bitcoinLightningEnabled: false,
+                            bitcoinLightningConfig: undefined
+                        };
+                        markClean(); // Data is fresh from API
+                    } else {
+                        console.log('No data found on server, starting with fresh store');
+                        // No data on server, start fresh
+                        initializeFreshStore();
                     }
                 }
 
@@ -743,21 +800,14 @@
                 await renderCurrentHiveAccount();
                 await loadBitcoinLightningSettings();
                 
-                // Update publish status
+                // Update UI state
                 updatePublishStatus();
+                updateSaveDraftButton();
                 
                 console.log('App initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize app:', error);
-                // If everything fails, just render what's in localStorage
-                await renderStoreSettings();
-                await renderCategoryOptions();
-                await renderItems();
-                await renderCurrentHiveAccount();
-                await loadBitcoinLightningSettings();
-                
-                // Update publish status
-                updatePublishStatus();
+                alert('Failed to load your store data. Please refresh the page and try again.');
             }
         }
 
@@ -915,7 +965,7 @@
             publishStoreBtn.textContent = isPublished ? '🔄 Republishing...' : '🚀 Publishing...';
 
             try {
-                // Get all current data (from drafts or published)
+                // Get all current data from memory
                 const items = await getItems();
                 const config = {
                     items: items,
@@ -929,18 +979,8 @@
                     // Mark as published
                     localStorage.setItem('pos_store_published', 'true');
                     
-                    // Move draft data to published data
-                    const draftItems = localStorage.getItem('pos_draft_items');
-                    const draftSettings = localStorage.getItem('pos_draft_settings');
-                    
-                    if (draftItems) {
-                        localStorage.setItem('pos_items', draftItems);
-                        localStorage.removeItem('pos_draft_items');
-                    }
-                    if (draftSettings) {
-                        localStorage.setItem('pos_settings', draftSettings);
-                        localStorage.removeItem('pos_draft_settings');
-                    }
+                    // Mark as clean since we just saved
+                    markClean();
 
                     alert(`Store ${action}ed successfully! 🎉`);
                     updatePublishStatus();
