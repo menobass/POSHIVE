@@ -1069,6 +1069,7 @@
 
             // Metrics - can now pull from config or store data
             const itemsCount = userStore.items?.length || userStore.itemCount || 0;
+            const categoriesCount = userStore.categories?.length || userStore.categoryCount || 0;
             const cashiersCount = cashiers.length || 0;
             const totalSales = userStore.totalSales || 0; // Can be pulled from config
             const todayOrders = userStore.todayOrders || 0; // Can be pulled from config
@@ -1090,12 +1091,12 @@
                                 <div class="metric-label">Items</div>
                             </div>
                             <div class="metric-card">
-                                <div class="metric-number">${cashiersCount}</div>
-                                <div class="metric-label">Cashiers</div>
+                                <div class="metric-number">${categoriesCount}</div>
+                                <div class="metric-label">Categories</div>
                             </div>
                             <div class="metric-card">
-                                <div class="metric-number">$${totalSales.toFixed(2)}</div>
-                                <div class="metric-label">Total Sales</div>
+                                <div class="metric-number">${cashiersCount}</div>
+                                <div class="metric-label">Cashiers</div>
                             </div>
                             <div class="metric-card">
                                 <div class="metric-number">${todayOrders}</div>
