@@ -1322,7 +1322,7 @@
         };
 
         // Add debug entry
-        function addDebugEntry(method, url, status, response, error = null) {
+        function addDebugEntry(method, url, status, response, error = null, requestBody = null) {
             const timestamp = new Date().toLocaleTimeString();
             const entry = {
                 timestamp,
@@ -1330,7 +1330,8 @@
                 url,
                 status,
                 response,
-                error
+                error,
+                requestBody
             };
             
             debugEntries.unshift(entry); // Add to beginning
@@ -1361,6 +1362,14 @@
                         ? JSON.stringify(entry.response, null, 2)
                         : entry.response);
 
+                let requestBodySection = '';
+                if (entry.requestBody) {
+                    const requestBodyText = typeof entry.requestBody === 'object' 
+                        ? JSON.stringify(entry.requestBody, null, 2)
+                        : entry.requestBody;
+                    requestBodySection = `<div class="debug-response" style="border-color: #4fc1ff;"><strong>Request Body:</strong><br>${requestBodyText}</div>`;
+                }
+
                 return `
                     <div class="debug-entry">
                         <div class="debug-timestamp">${entry.timestamp}</div>
@@ -1369,7 +1378,8 @@
                             <span class="debug-url">${entry.url}</span>
                         </div>
                         <div>Status: <span class="${statusClass}">${entry.status || 'ERROR'}</span></div>
-                        <div class="debug-response">${responseText}</div>
+                        ${requestBodySection}
+                        <div class="debug-response"><strong>Response:</strong><br>${responseText}</div>
                     </div>
                 `;
             }).join('');
@@ -1381,21 +1391,48 @@
             const [url, options = {}] = args;
             const method = options.method || 'GET';
             
+            // Capture request body for debugging
+            let requestBody = null;
+            if (options.body) {
+                try {
+                    if (typeof options.body === 'string') {
+                        requestBody = JSON.parse(options.body);
+                    } else {
+                        requestBody = options.body;
+                    }
+                } catch {
+                    requestBody = options.body;
+                }
+            }
+            
             try {
                 const response = await originalFetch.apply(this, args);
+                
+                // Clone the response for debugging - handle asynchronously to avoid blocking
                 const responseClone = response.clone();
                 
-                let responseData;
-                try {
-                    responseData = await responseClone.json();
-                } catch {
-                    responseData = await responseClone.text();
-                }
+                // Process debug info in background without blocking the main response
+                responseClone.text().then(responseText => {
+                    let responseData;
+                    try {
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json') && responseText.trim()) {
+                            responseData = JSON.parse(responseText);
+                        } else {
+                            responseData = responseText || 'Empty response';
+                        }
+                    } catch (parseError) {
+                        responseData = responseText || 'Unable to parse response';
+                    }
+                    
+                    addDebugEntry(method, url, response.status, responseData, null, requestBody);
+                }).catch(debugError => {
+                    addDebugEntry(method, url, response.status, `Debug error: ${debugError.message}`, null, requestBody);
+                });
                 
-                addDebugEntry(method, url, response.status, responseData);
                 return response;
             } catch (error) {
-                addDebugEntry(method, url, null, null, error.message);
+                addDebugEntry(method, url, null, null, error.message, requestBody);
                 throw error;
             }
         };
