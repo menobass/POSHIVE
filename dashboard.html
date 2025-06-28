@@ -1228,6 +1228,36 @@
             }
         }
 
+        // Event listeners
+        document.getElementById('logoutBtn').onclick = logout;
+        document.getElementById('createStoreBtn').onclick = createNewStore;
+        document.getElementById('addCashierBtn').onclick = openAddCashierModal;
+        document.getElementById('cashierForm').onsubmit = saveCashier;
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Never';
+            try {
+                return new Date(dateString).toLocaleDateString();
+            } catch {
+                return 'Invalid date';
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            // Simple console log for now - you can implement a proper toast later
+            console.log(`${type.toUpperCase()}: ${message}`);
+            if (type === 'error') {
+                alert(`Error: ${message}`);
+            }
+        }
+
         // Start the application
         initializeDashboard();
     </script>
