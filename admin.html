@@ -504,12 +504,27 @@
             }
         }
 
-        async function saveConfigToAPI(config, storeId = null) {
+        async function saveConfigToAPI(config, isExistingStore = false) {
             try {
-                console.log('Saving config to API:', config);
-                // Always use /api/config endpoint since we have single-store model
-                const url = `${API_BASE_URL}/config`;
-                const method = 'PUT'; // Always PUT for updating config
+                console.log('Saving config to API:', config, 'isExistingStore:', isExistingStore);
+                
+                let url, method;
+                
+                if (isExistingStore) {
+                    // Update existing store - use the store ID from currentData
+                    const storeId = currentData._id || currentData.settings._id;
+                    if (!storeId) {
+                        throw new Error('Store ID not found for existing store update');
+                    }
+                    url = `${API_BASE_URL}/stores/${storeId}`;
+                    method = 'PUT';
+                    console.log('Updating existing store with ID:', storeId);
+                } else {
+                    // Create new store
+                    url = `${API_BASE_URL}/config`;
+                    method = 'PUT';
+                    console.log('Creating new store');
+                }
                 
                 const response = await fetch(url, {
                     method,
@@ -528,6 +543,11 @@
                 console.error('Failed to save config to API:', error);
                 return false;
             }
+        }
+
+        // Helper function to detect if we have an existing store
+        function hasExistingStore() {
+            return !!(currentData._id || currentData.settings._id);
         }
 
         // Global state for tracking changes
@@ -679,17 +699,15 @@
                     settings: currentData.settings
                 };
 
-                // Save to API as draft
-                const result = await saveConfigToAPI(config, currentStoreId);
+                // Save to API as draft using the correct endpoint
+                const existingStore = hasExistingStore();
+                const result = await saveConfigToAPI(config, existingStore);
                 
                 if (result) {
-                    // If this was a new store, update the current store ID
-                    if (!currentStoreId && result.id) {
-                        currentStoreId = result.id;
-                        // Update URL to include store ID
-                        const newUrl = new URL(window.location);
-                        newUrl.searchParams.set('storeId', currentStoreId);
-                        window.history.replaceState({}, '', newUrl);
+                    // If this was a new store, store the returned ID
+                    if (!existingStore && result._id) {
+                        currentData._id = result._id;
+                        console.log('Draft saved for new store with ID:', result._id);
                     }
                     
                     markClean();
@@ -1014,7 +1032,7 @@
                 
                 if (apiConfig) {
                     console.log('Store config loaded from API');
-                    // Load data into memory
+                    // Load data into memory and preserve the store ID
                     currentData.items = apiConfig.items || [];
                     currentData.settings = apiConfig.settings || {
                         businessName: '',
@@ -1024,6 +1042,15 @@
                         bitcoinLightningEnabled: false,
                         bitcoinLightningConfig: undefined
                     };
+                    
+                    // Preserve store ID - it could be at root level or in settings
+                    if (apiConfig._id) {
+                        currentData._id = apiConfig._id;
+                    }
+                    if (apiConfig.settings && apiConfig.settings._id) {
+                        currentData.settings._id = apiConfig.settings._id;
+                    }
+                    
                     markClean(); // Data is fresh from API
                     
                     // Update page title with store name
@@ -1196,23 +1223,41 @@
 
         async function updatePublishStatus() {
             const isPublished = localStorage.getItem('pos_store_published') === 'true';
+            const existingStore = hasExistingStore();
             
-            if (isPublished) {
+            if (isPublished && existingStore) {
+                // Store exists and is published - show republish option
                 draftStatus.style.display = 'none';
                 publishedStatus.style.display = 'block';
                 publishStoreBtn.textContent = '🔄 Republish Changes';
                 publishStoreBtn.style.background = '#007bff';
-            } else {
+            } else if (existingStore) {
+                // Store exists but not published - show publish option
                 draftStatus.style.display = 'block';
                 publishedStatus.style.display = 'none';
                 publishStoreBtn.textContent = '🚀 Publish Store';
+                publishStoreBtn.style.background = '#28a745';
+            } else {
+                // No store exists - show create new store option
+                draftStatus.style.display = 'block';
+                publishedStatus.style.display = 'none';
+                publishStoreBtn.textContent = '🚀 Publish New Store';
                 publishStoreBtn.style.background = '#28a745';
             }
         }
 
         publishStoreBtn.onclick = async function() {
             const isPublished = localStorage.getItem('pos_store_published') === 'true';
-            const action = isPublished ? 'republish' : 'publish';
+            const existingStore = hasExistingStore();
+            
+            let action;
+            if (existingStore && isPublished) {
+                action = 'republish';
+            } else if (existingStore) {
+                action = 'publish';
+            } else {
+                action = 'publish new';
+            }
             
             // Validation - ensure user has at least business name
             const settings = await getStoreSettings();
@@ -1227,7 +1272,14 @@
             }
 
             publishStoreBtn.disabled = true;
-            publishStoreBtn.textContent = isPublished ? '🔄 Republishing...' : '🚀 Publishing...';
+            
+            if (action === 'republish') {
+                publishStoreBtn.textContent = '🔄 Republishing...';
+            } else if (action === 'publish new') {
+                publishStoreBtn.textContent = '� Publishing New Store...';
+            } else {
+                publishStoreBtn.textContent = '🚀 Publishing...';
+            }
 
             try {
                 // Get all current data from memory
@@ -1238,10 +1290,16 @@
                     published: true
                 };
 
-                // Save to API (single-store model, no store ID needed)
-                const result = await saveConfigToAPI(config);
+                // Save to API using the correct endpoint based on store existence
+                const result = await saveConfigToAPI(config, existingStore);
                 
                 if (result) {
+                    // If this was a new store, store the returned ID
+                    if (!existingStore && result._id) {
+                        currentData._id = result._id;
+                        console.log('New store created with ID:', result._id);
+                    }
+                    
                     // Mark as published
                     localStorage.setItem('pos_store_published', 'true');
                     
