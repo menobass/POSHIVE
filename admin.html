@@ -544,10 +544,10 @@
                     method = 'PUT';
                     console.log('Updating existing store with ID:', storeId);
                 } else {
-                    // Create new store - try POST /api/stores first, fallback to POST /api/config
-                    url = `${API_BASE_URL}/stores`;
+                    // Create new store - use POST /api/config
+                    url = `${API_BASE_URL}/config`;
                     method = 'POST';
-                    console.log('Creating new store using POST /api/stores');
+                    console.log('Creating new store using POST /api/config');
                 }
                 
                 const response = await fetch(url, {
@@ -560,22 +560,6 @@
                     const result = await response.json();
                     console.log('Config saved to API successfully:', result);
                     return result;
-                } else if (!isExistingStore && response.status === 404) {
-                    // If POST /api/stores doesn't work, try POST /api/config
-                    console.log('POST /api/stores failed, trying POST /api/config');
-                    const fallbackResponse = await fetch(`${API_BASE_URL}/config`, {
-                        method: 'POST',
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify(config)
-                    });
-                    
-                    if (fallbackResponse.ok) {
-                        const fallbackResult = await fallbackResponse.json();
-                        console.log('Config saved to API successfully using fallback:', fallbackResult);
-                        return fallbackResult;
-                    } else {
-                        throw new Error(`API Error: ${fallbackResponse.status}`);
-                    }
                 } else {
                     throw new Error(`API Error: ${response.status}`);
                 }
