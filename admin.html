@@ -495,12 +495,30 @@
                     console.log('No config found, user has not published store yet');
                     localStorage.removeItem('pos_store_published');
                     return null;
+                } else if (response.status === 400) {
+                    // Handle "No store assigned to user" case
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.message === "No store assigned to user" || errorData.message?.includes("No store")) {
+                            console.log('No store assigned to user');
+                            localStorage.removeItem('pos_store_published');
+                            return null;
+                        } else {
+                            console.warn(`API returned 400: ${errorData.message}`);
+                            return null; // Treat as no store for new users
+                        }
+                    } catch (parseError) {
+                        console.warn('Could not parse 400 response, treating as no store');
+                        return null;
+                    }
                 } else {
-                    throw new Error(`API Error: ${response.status}`);
+                    console.warn(`API returned ${response.status}, treating as no store for new user`);
+                    return null; // Don't throw error for new users
                 }
             } catch (error) {
                 console.error('Failed to load config from API:', error);
-                throw error; // Don't fall back to localStorage anymore
+                console.log('Network or other error, treating as new user with no store');
+                return null; // Don't throw error - treat as new user
             }
         }
 
@@ -1072,7 +1090,7 @@
                         console.log('New user detected, initializing fresh store');
                         
                         // Initialize fresh store (in memory only)
-                        const freshData = initializeFreshStore();
+                        initializeFreshStore();
                         
                         // Show onboarding
                         showNewUserOnboarding();
@@ -1099,7 +1117,30 @@
                 console.log('App initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize app:', error);
-                alert('Failed to load your store data. Please refresh the page and try again.');
+                // For new users, don't show error - just initialize fresh store
+                console.log('Initializing fresh store due to initialization error');
+                
+                const pageTitle = document.getElementById('pageTitle');
+                pageTitle.textContent = 'Create New Store';
+                
+                initializeFreshStore();
+                
+                // Render the UI with default data
+                try {
+                    await renderStoreSettings();
+                    await renderCategoryOptions();
+                    await renderItems();
+                    await renderCurrentHiveAccount();
+                    await loadBitcoinLightningSettings();
+                    
+                    updatePublishStatus();
+                    updateSaveDraftButton();
+                    
+                    console.log('App initialized with fresh store after error');
+                } catch (renderError) {
+                    console.error('Failed to render UI:', renderError);
+                    alert('Failed to load the admin interface. Please refresh the page and try again.');
+                }
             }
         }
 
