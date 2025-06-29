@@ -408,8 +408,14 @@
                 let responseData;
                 try {
                     responseData = await responseClone.json();
-                } catch {
-                    responseData = await responseClone.text();
+                } catch (jsonError) {
+                    try {
+                        // Create a fresh clone for text reading
+                        const textClone = response.clone();
+                        responseData = await textClone.text();
+                    } catch (textError) {
+                        responseData = `Failed to read response: ${textError.message}`;
+                    }
                 }
                 
                 addDebugEntry(method, url, response.status, responseData);
