@@ -544,10 +544,10 @@
                     method = 'PUT';
                     console.log('Updating existing store with ID:', storeId);
                 } else {
-                    // Create new store - use PUT /api/config
-                    url = `${API_BASE_URL}/config`;
-                    method = 'PUT';
-                    console.log('Creating new store using PUT /api/config');
+                    // Create new store - use POST /api/stores
+                    url = `${API_BASE_URL}/stores`;
+                    method = 'POST';
+                    console.log('Creating new store using POST /api/stores');
                 }
                 
                 const response = await fetch(url, {
