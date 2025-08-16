@@ -19,8 +19,11 @@
         .current-account { font-size: 0.98em; color: var(--text-secondary); margin-bottom: 1.2em; text-align: left; }
         .amount-input { font-size: 1.6em; text-align: center; width: 100%; margin-bottom: 1.2em; border: 1px solid var(--border-color); background: var(--background-color); color: var(--text-primary); border-radius: 8px; padding: 0.6em; }
     .generate-btn { width: 100%; margin-bottom: 1.5em; }
-        #qrContainer { display: flex; flex-direction: column; align-items: center; margin-top: 2em; }
-        #qrCode { margin-bottom: 1.2em; }
+    #qrContainer { display: flex; flex-direction: column; align-items: center; margin-top: 2em; }
+    #qrCode { margin-bottom: 1.2em; }
+    /* Provide a clear white quiet zone around the QR for better scanning */
+    .qr-box { background:#fff; padding:16px; border-radius:12px; box-shadow: 0 4px 18px rgba(0,0,0,0.15); }
+    #qrCode canvas { image-rendering: pixelated; display:block; }
     #paymentStatus { font-size: 1.05em; color: var(--success-color); margin-bottom: 1.2em; text-align: center; }
     .reset-btn { width: auto; }
         @media (max-width: 600px) {
@@ -150,17 +153,19 @@
         const base64 = btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
         const uri = `hive://sign/op/${base64}`;
         // Show QR
-        qrContainer.style.display = 'flex';
-        qrCodeDiv.innerHTML = '';
-        new QRCode(qrCodeDiv, {
+    qrContainer.style.display = 'flex';
+    // Ensure a white padded box around the QR (quiet zone)
+    qrCodeDiv.innerHTML = '<div id="qrCanvasBox" class="qr-box"></div>';
+    new QRCode(document.getElementById('qrCanvasBox'), {
             text: uri,
-            width: 240,
-            height: 240,
+            width: 320,
+            height: 320,
             colorDark: '#000',
             colorLight: '#fff',
             correctLevel: QRCode.CorrectLevel.H
         });
-        qrDetails.innerHTML = `<b>To:</b> @${acc}<br><b>Amount:</b> ${amt.toFixed(3)} HBD<br><b>Memo:</b> <span style='font-family:monospace;'>${memo}</span>`;
+    qrDetails.innerHTML = `<b>To:</b> @${acc}<br><b>Amount:</b> ${amt.toFixed(3)} HBD<br><b>Memo:</b> <span style='font-family:monospace;'>${memo}</span>
+    <div style="margin-top:0.75em;word-break:break-all;font-size:0.92em;background:#f4f4f4;color:#000;padding:0.5em 0.6em;border-radius:6px;font-family:monospace;">${uri}</div>`;
         paymentStatus.textContent = '⏳ Waiting for payment...';
         resetBtn.style.display = 'none';
         startPaymentListener(acc, amt.toFixed(3) + ' HBD', memo);
