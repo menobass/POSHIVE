@@ -36,7 +36,7 @@
         <div class="subtitle">Generate QR Payments quickly - Powered by Distriator</div>
         <label for="hiveAccountInput">Receiving Hive Account</label>
         <div class="row">
-            <input type="text" id="hiveAccountInput" placeholder="e.g. myshop.hive" autocomplete="off" />
+            <input type="text" id="hiveAccountInput" placeholder="e.g. myshop.hive" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="text-transform: lowercase;" />
             <button class="update-btn" id="updateAccountBtn">Update</button>
         </div>
         <div class="current-account" id="currentAccountDisplay">
@@ -93,9 +93,22 @@
         }
     }
     renderCurrentAccount();
+    // Force lowercase (and strip leading @) as the user types
+    hiveAccountInput.addEventListener('input', () => {
+        const pos = hiveAccountInput.selectionStart;
+        const val = hiveAccountInput.value;
+        const sanitized = val.toLowerCase().replace(/^@+/, '');
+        if (val !== sanitized) {
+            hiveAccountInput.value = sanitized;
+            if (typeof pos === 'number') {
+                const newPos = Math.max(0, pos - (val.length - sanitized.length));
+                hiveAccountInput.setSelectionRange(newPos, newPos);
+            }
+        }
+    });
     // --- Update account logic ---
     updateAccountBtn.onclick = function() {
-        const acc = hiveAccountInput.value.trim();
+        const acc = hiveAccountInput.value.trim().toLowerCase().replace(/^@+/, '');
         if (!acc) { alert('Please enter a Hive account.'); return; }
         setStoredAccount(acc);
         renderCurrentAccount();
