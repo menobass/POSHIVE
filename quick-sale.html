@@ -53,6 +53,17 @@
             <div id="paymentStatus"></div>
             <button class="btn btn-secondary reset-btn" id="resetBtn" style="display:none;">New Sale</button>
         </div>
+
+        <!-- Recent Incoming Payments -->
+        <div class="card" id="recentPaymentsCard" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h2>Recent Incoming Payments</h2>
+            </div>
+            <div class="card-body">
+                <div id="recentStatus" class="text-muted" style="margin-bottom: 0.75rem;">Set a receiving account to view recent payments.</div>
+                <ul id="recentList" style="list-style: none; padding: 0; margin: 0;"></ul>
+            </div>
+        </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
@@ -113,6 +124,7 @@
         if (!acc) { alert('Please enter a Hive account.'); return; }
         setStoredAccount(acc);
         renderCurrentAccount();
+    updateRecentTransactions();
         hiveAccountInput.value = '';
     };
     // --- Generate QR logic ---
@@ -183,6 +195,8 @@
                         clearInterval(paymentListenerInterval);
                         paymentListenerInterval = null;
                         resetBtn.style.display = 'block';
+                        // Refresh recent transactions after a confirmed payment
+                        updateRecentTransactions();
                         alert('Payment confirmed!');
                         return;
                     }
@@ -208,6 +222,104 @@
         amountInput.value = '';
         resetBtn.style.display = 'none';
     };
+
+    // --- Recent Incoming Payments ---
+    function formatAmount(amountStr) {
+        return amountStr; // already like '1.000 HBD'
+    }
+
+    function truncateMemo(memo, max = 60) {
+        if (!memo) return '';
+        return memo.length > max ? memo.slice(0, max - 1) + '…' : memo;
+    }
+
+    async function fetchRecentIncoming(hiveAccount, desired = 10) {
+        try {
+            const res = await fetch('https://api.hive.blog', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.get_account_history',
+                    params: [hiveAccount, -1, 100],
+                    id: 2
+                })
+            });
+            const data = await res.json();
+            const history = data.result || [];
+            const incoming = [];
+            for (let i = history.length - 1; i >= 0; i--) {
+                const rec = history[i][1];
+                const op = rec.op;
+                if (op && op[0] === 'transfer') {
+                    const details = op[1];
+                    if (details && details.to && details.to.toLowerCase() === hiveAccount.toLowerCase()) {
+                        incoming.push({
+                            from: details.from,
+                            to: details.to,
+                            amount: details.amount,
+                            memo: details.memo,
+                            timestamp: rec.timestamp
+                        });
+                        if (incoming.length >= desired) break;
+                    }
+                }
+            }
+            return incoming;
+        } catch (e) {
+            console.error('Failed to fetch recent incoming payments:', e);
+            return null;
+        }
+    }
+
+    function renderRecentTransactions(list) {
+        const status = document.getElementById('recentStatus');
+        const ul = document.getElementById('recentList');
+        if (!list) {
+            status.textContent = 'Failed to load recent payments.';
+            ul.innerHTML = '';
+            return;
+        }
+        if (list.length === 0) {
+            status.textContent = 'No recent incoming payments found.';
+            ul.innerHTML = '';
+            return;
+        }
+        status.textContent = '';
+        ul.innerHTML = list.map(tx => {
+            const when = new Date(tx.timestamp + 'Z');
+            const timeStr = isNaN(when.getTime()) ? tx.timestamp : when.toLocaleString();
+            const memo = tx.memo ? ` • <span class="text-muted">${truncateMemo(tx.memo)}</span>` : '';
+            return `
+                <li style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">
+                    <div style="display:flex; justify-content: space-between; gap: 0.75rem;">
+                        <div>
+                            <strong>${formatAmount(tx.amount)}</strong> from @${tx.from}${memo}
+                        </div>
+                        <div class="text-muted" style="white-space: nowrap;">${timeStr}</div>
+                    </div>
+                </li>
+            `;
+        }).join('');
+    }
+
+    async function updateRecentTransactions() {
+        const acc = getStoredAccount();
+        const status = document.getElementById('recentStatus');
+        const ul = document.getElementById('recentList');
+        if (!acc) {
+            status.textContent = 'Set a receiving account to view recent payments.';
+            ul.innerHTML = '';
+            return;
+        }
+        status.textContent = 'Loading recent payments…';
+        ul.innerHTML = '';
+        const list = await fetchRecentIncoming(acc, 10);
+        renderRecentTransactions(list);
+    }
+
+    // Initial load
+    updateRecentTransactions();
     </script>
 </body>
 </html>
