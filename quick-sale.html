@@ -4,27 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quick Sales / Venta Rápida</title>
-    <meta name="theme-color" content="#b5651d">
+    <meta name="theme-color" content="#15202b">
     <link rel="apple-touch-icon" href="images/sweetplace logo.png">
+    <link rel="stylesheet" href="https://menobass.github.io/snapnpay/styles.css">
     <style>
-        body { font-family: Arial, sans-serif; background: #f8f8f8; margin: 0; padding: 0; }
-        .container { max-width: 420px; margin: 2.5em auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px #eee; padding: 2em 1.5em 2.5em 1.5em; }
-        h1 { color: #b5651d; font-size: 2em; margin-bottom: 0.2em; text-align: center; }
-        .subtitle { color: #7a5a36; font-size: 1em; text-align: center; margin-bottom: 2em; }
-        label { font-weight: bold; color: #b5651d; display: block; margin-bottom: 0.3em; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: var(--background-color); color: var(--text-primary); margin: 0; padding: 0; }
+        .container { max-width: 420px; margin: 2.5em auto; background: var(--card-background); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 2em 1.5em 2.5em 1.5em; border: 1px solid var(--border-color); }
+        h1 { color: var(--primary-color); font-size: 2em; margin-bottom: 0.2em; text-align: center; }
+        .subtitle { color: var(--text-secondary); font-size: 1em; text-align: center; margin-bottom: 2em; }
+        label { font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.3em; }
         .row { display: flex; align-items: center; gap: 0.7em; margin-bottom: 1.2em; }
-        input[type=text], input[type=number] { font-size: 1.2em; padding: 0.5em 0.7em; border-radius: 6px; border: 1px solid #ccc; flex: 1 1 0%; }
-        .update-btn { background: #2980b9; color: #fff; border: none; border-radius: 6px; padding: 0.5em 1.1em; font-size: 1em; cursor: pointer; }
-        .current-account { font-size: 0.98em; color: #555; margin-bottom: 1.2em; text-align: left; }
-        .amount-input { font-size: 2em; text-align: center; width: 100%; margin-bottom: 1.2em; border: 2px solid #b5651d; }
-        .generate-btn { width: 100%; background: #27ae60; color: #fff; border: none; padding: 1em; border-radius: 6px; font-size: 1.3em; margin-bottom: 1.5em; cursor: pointer; }
+        input[type=text], input[type=number] { font-size: 1.1em; }
+        .form-control { width: 100%; padding: 0.75em; border: 1px solid var(--border-color); border-radius: 8px; background: var(--background-color); color: var(--text-primary); }
+        .current-account { font-size: 0.98em; color: var(--text-secondary); margin-bottom: 1.2em; text-align: left; }
+        .amount-input { font-size: 1.6em; text-align: center; width: 100%; margin-bottom: 1.2em; border: 1px solid var(--border-color); background: var(--background-color); color: var(--text-primary); border-radius: 8px; padding: 0.6em; }
+    .generate-btn { width: 100%; margin-bottom: 1.5em; }
         #qrContainer { display: flex; flex-direction: column; align-items: center; margin-top: 2em; }
         #qrCode { margin-bottom: 1.2em; }
-        #paymentStatus { font-size: 1.15em; color: #27ae60; margin-bottom: 1.2em; text-align: center; }
-        .reset-btn { background: #b5651d; color: #fff; border: none; border-radius: 6px; padding: 0.7em 2em; font-size: 1.1em; cursor: pointer; }
+    #paymentStatus { font-size: 1.05em; color: var(--success-color); margin-bottom: 1.2em; text-align: center; }
+    .reset-btn { width: auto; }
         @media (max-width: 600px) {
             .container { padding: 1em 0.5em; }
-            h1 { font-size: 1.3em; }
+            h1 { font-size: 1.6em; }
             .subtitle { font-size: 0.95em; }
             .amount-input { font-size: 1.3em; }
         }
@@ -36,21 +37,21 @@
         <div class="subtitle">Generate QR Payments quickly - Powered by Distriator</div>
         <label for="hiveAccountInput">Receiving Hive Account</label>
         <div class="row">
-            <input type="text" id="hiveAccountInput" placeholder="e.g. myshop.hive" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="text-transform: lowercase;" />
-            <button class="update-btn" id="updateAccountBtn">Update</button>
+            <input type="text" id="hiveAccountInput" class="form-control" placeholder="e.g. myshop.hive" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="text-transform: lowercase;" />
+            <button class="btn btn-primary" id="updateAccountBtn">Update</button>
         </div>
         <div class="current-account" id="currentAccountDisplay">
-            <span id="currentAccountAvatar" style="vertical-align:middle;display:inline-block;width:32px;height:32px;border-radius:50%;background:#eee;overflow:hidden;margin-right:0.5em;"></span>
+            <span id="currentAccountAvatar" style="vertical-align:middle;display:inline-block;width:32px;height:32px;border-radius:50%;background: var(--border-color);overflow:hidden;margin-right:0.5em;"></span>
             Current: <span id="currentAccount">none</span>
         </div>
         <label for="amountInput">Amount (HBD)</label>
-        <input type="number" id="amountInput" class="amount-input" min="0.01" step="0.01" placeholder="0.00" />
-        <button class="generate-btn" id="generateQrBtn">Generate QR</button>
+    <input type="number" id="amountInput" class="amount-input form-control" min="0.01" step="0.01" placeholder="0.00" />
+    <button class="btn btn-success generate-btn" id="generateQrBtn">Generate QR</button>
         <div id="qrContainer" style="display:none;">
             <div id="qrCode"></div>
             <div id="qrDetails"></div>
             <div id="paymentStatus"></div>
-            <button class="reset-btn" id="resetBtn" style="display:none;">New Sale</button>
+            <button class="btn btn-secondary reset-btn" id="resetBtn" style="display:none;">New Sale</button>
         </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
